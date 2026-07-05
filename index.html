@@ -172,6 +172,29 @@ a{color:inherit;text-decoration:none}
 .step-val{width:104px;background:none;border:none;text-align:center;font-size:34px;font-weight:700;color:var(--text)}
 .step-val:focus{outline:none}
 .sheet-done{width:100%;padding:15px;border-radius:var(--radius);font-size:16px;font-weight:700;background:var(--text);color:var(--bg)}
+
+/* TINY SCREENS (Jelly 2 ≈ 320 CSS px wide, short) */
+@media (max-width:360px){
+  body{font-size:14px}
+  .pinkey{width:58px;height:58px;font-size:22px}
+  #pinPad{grid-template-columns:repeat(3,58px)!important;gap:12px!important}
+  #pinLock{padding:16px}
+  #pinLock>div:first-child{font-size:34px;margin-bottom:4px}
+  .tools-row{flex-wrap:wrap}
+  .step-btn{width:54px;height:54px;font-size:24px}
+  .step-val{width:84px;font-size:28px}
+  .timer-time{font-size:21px}
+  .tbtn{min-width:46px;padding:9px 10px;font-size:12px}
+  .set-val{font-size:17px}
+  .val-chip{min-width:50px;padding:6px 8px}
+  .set-tick{width:44px;height:44px}
+  .home-title{font-size:21px}
+}
+@media (max-height:620px){
+  .pinkey{width:54px;height:54px;font-size:20px}
+  #pinPad{grid-template-columns:repeat(3,54px)!important;gap:10px!important}
+  #pinDots{margin-bottom:20px!important}
+}
 </style>
 </head>
 <body>
@@ -208,7 +231,9 @@ a{color:inherit;text-decoration:none}
     <div class="schedule-row" id="scheduleRow"></div>
   </div>
   <div id="dayList" class="day-list"></div>
-  <div class="tools-row">
+  <div id="backupNudge" style="text-align:center;font-size:12px;color:var(--text3);padding:14px 14px 0;min-height:14px"></div>
+  <div class="tools-row" style="padding-top:10px">
+    <button class="tool-btn" onclick="openStats()">📊 Stats</button>
     <button class="tool-btn" onclick="exportData()">⬇ Backup</button>
     <button class="tool-btn" onclick="document.getElementById('importFile').click()">⬆ Restore</button>
     <button class="tool-btn danger" onclick="resetData()">Reset</button>
@@ -258,6 +283,18 @@ a{color:inherit;text-decoration:none}
 </div>
 
 
+<!-- STATS SCREEN -->
+<div class="screen" id="screenStats">
+  <div class="wk-header">
+    <button class="back-btn" onclick="statsBack()" aria-label="Back">←</button>
+    <div class="wk-title-block">
+      <div class="wk-title" id="statsTitle">Stats</div>
+      <div class="wk-sub-text" id="statsSub"></div>
+    </div>
+  </div>
+  <div style="flex:1;overflow-y:auto;padding:14px 14px 40px" id="statsBody"></div>
+</div>
+
 <div class="sheet-back" id="sheetBack" onclick="closeSheet()"></div>
 <div class="sheet" id="sheet">
   <div class="sheet-title" id="sheetTitle"></div>
@@ -296,6 +333,8 @@ function startTimedSet(exId,si,durSec){
   timerLeft=durSec;
   timerEnd=Date.now()+durSec*1000;
   timerRunning=true;
+  ensureNotifPerm();
+  scheduleRestAlarm();
   // When done: tick set and restore rest timer
   const origDone=timerDone;
   timerDone=function(){
@@ -311,12 +350,25 @@ function startTimedSet(exId,si,durSec){
 }
 
 // ── TIMED CHECKLIST ITEM ───────────────────────────────────────────────────
-// For warm-up/finisher items that have a timerSec (e.g. dead hangs)
+// For warm-up/finisher items that have a timerSec (e.g. dead hangs).
+// Option B: fires once per rep (e.g. 2x). After each rep it beeps and waits
+// for another tap; only ticks the whole item once all reps are done.
+let timedCheckState={}; // idx -> reps completed so far
+function timedCheckReps(label){
+  // parse leading "N×" from the label (e.g. "2×30 sec" -> 2). Default 1.
+  const m=(label||'').match(/(\d+)\s*[×x]/);
+  return m?parseInt(m[1],10):1;
+}
 function startTimedCheck(idx,durSec,label){
+  const totalReps=timedCheckReps(label);
+  const doneReps=timedCheckState[idx]||0;
+  const thisRep=doneReps+1;
   const prevDur=timerDur;
   timerDur=durSec; timerLeft=durSec;
   timerEnd=Date.now()+durSec*1000;
   timerRunning=true;
+  ensureNotifPerm();
+  scheduleRestAlarm();
   const d=document.getElementById('timerDisp');
   const origDone=timerDone;
   timerDone=function(){
@@ -324,9 +376,13 @@ function startTimedCheck(idx,durSec,label){
     if(d){d.classList.add('flash');setTimeout(()=>d.classList.remove('flash'),2200);}
     timerDur=prevDur; timerLeft=prevDur;
     timerDone=origDone;
-    // auto-tick the checklist item
-    if(!checks[currentDay]) checks[currentDay]={};
-    checks[currentDay][idx]=true;
+    timedCheckState[idx]=thisRep;
+    if(thisRep>=totalReps){
+      // all reps done — tick the whole item and clear rep tracking
+      if(!checks[currentDay]) checks[currentDay]={};
+      checks[currentDay][idx]=true;
+      delete timedCheckState[idx];
+    }
     saveAll(); renderWorkout();
   };
   runTicker(); updateTimerUI();
@@ -338,6 +394,7 @@ function showScreen(id){
   document.getElementById(id).classList.add('active');
   if(id==='screenPack') renderPack();
   if(id==='screenHome') renderHome();
+  if(id==='screenStats') renderStats();
 }
 
 // ── PACKING CHECKLIST ──────────────────────────────────────────────────────
@@ -413,10 +470,8 @@ const DAYS = [
     id:'A', label:'Day A', title:'Lower — Quad', color:'#a3e635', est:'55 min',
     schedule: 'Mon',
     warmup:[
-      {t:'Treadmill backward walk — 3 min',         v:yt('treadmill backward walk IT band')},
       {t:'ATG ankle pulses — 1 min/side',            v:yt('ATG ankle pulses mobility')},
       {t:'Deep squat 3-sec hold — 10 reps',          v:yt('deep squat hold mobility')},
-      {t:'Banded clamshells — 15/side',              v:yt('banded clamshell glute med')},
       {t:'Myrtle routine — both sides',              v:yt('myrtle routine hip mobility'), notes:[
         '1. Clams — 8/side',
         '2. Lateral leg raise — 8 neutral · 8 hips up · 8 hips down',
@@ -435,9 +490,9 @@ const DAYS = [
     exercises:[
       {id:'A_sq',  name:'Barbell back squat',   target:'4×8', hasW:true},
       {id:'A_bss', name:'Bulgarian split squat', target:'3×10', hasW:true},
-      {id:'A_lp',  name:'Leg press',             target:'3×12', hasW:true},
       {id:'A_lsu', name:'Lateral step-up',       target:'3×10', hasW:true},
       {id:'A_atg', name:'ATG split squat',        target:'2×8', hasW:true},
+      {id:'A_lp',  name:'Leg press',             target:'3×12', hasW:true},
     ],
     finisher:[
       {t:'Cossack squat — 2×8/side',              v:yt('cossack squat mobility')},
@@ -473,7 +528,8 @@ const DAYS = [
       {id:'B_dbr', name:'Single-arm DB row',              target:'3×10', hasW:true},
       {id:'B_clh', name:'Cable low-to-high pull',         target:'3×12', hasW:true},
       {id:'B_dsr', name:'Diverging seated row',           target:'3×12', hasW:true},
-      {id:'B_sat', name:'Tricep extension machine',       target:'3×10', hasW:true},
+      {id:'B_sat', name:'Reverse-grip cable pushdown',     target:'3×10', hasW:true},
+      {id:'B_rgc', name:'Reverse-grip cable curl',         target:'3×10', hasW:true},
       {id:'B_zc',  name:'Bicep curl machine',             target:'3×10', hasW:true},
     ],
     finisher:[
@@ -486,9 +542,7 @@ const DAYS = [
     id:'C', label:'Day C', title:'Glute Med + Core', color:'#f97316', est:'50 min',
     schedule: 'Wed',
     warmup:[
-      {t:'Treadmill backward walk — 3 min',         v:yt('treadmill backward walk IT band')},
       {t:'Single-leg glute bridge — 10/side',       v:yt('single leg glute bridge')},
-      {t:'Banded clamshells — 15/side',             v:yt('banded clamshell glute med')},
       {t:'Myrtle routine — both sides',             v:yt('myrtle routine hip mobility'), notes:[
         '1. Clams — 8/side',
         '2. Lateral leg raise — 8 neutral · 8 hips up · 8 hips down',
@@ -504,13 +558,13 @@ const DAYS = [
       ]},
     ],
     exercises:[
-      {id:'C_blw', name:'Banded lateral walk',        target:'3×15', hasW:false},
-      {id:'C_cop', name:'Copenhagen plank',            target:'3×25sec', hasW:false, timerSec:25},
-      {id:'C_gma', name:'Seated hip abduction machine', target:'3×15', hasW:true},
-      {id:'C_db',  name:'Dead bug',                   target:'3×10', hasW:false},
-      {id:'C_pp',  name:'Rotational Pallof press',    target:'3×12', hasW:false},
       {id:'C_sc',  name:"Single-arm farmer's hold", target:'3×45sec', hasW:true, timerSec:45},
+      {id:'C_blw', name:'Banded lateral walk',        target:'3×15', hasW:false},
+      {id:'C_pp',  name:'Rotational Pallof press',    target:'3×12', hasW:false},
+      {id:'C_cop', name:'Copenhagen plank',            target:'3×25sec', hasW:false, timerSec:25},
       {id:'C_rkc', name:'RKC plank',                  target:'3×25sec', hasW:false, timerSec:25},
+      {id:'C_db',  name:'Dead bug',                   target:'3×10', hasW:false},
+      {id:'C_gma', name:'Seated hip abduction machine', target:'3×15', hasW:true},
     ],
     finisher:[
       {t:'Elephant walk — 3 sets',                  v:yt('elephant walk hamstring stretch')},
@@ -522,10 +576,7 @@ const DAYS = [
     id:'D', label:'Day D', title:'Lower — Posterior', color:'#fb923c', est:'55 min',
     schedule: 'Fri',
     warmup:[
-      {t:'Treadmill backward walk — 3 min',         v:yt('treadmill backward walk IT band')},
-      {t:'Nordic curl negatives — 3 slow',          v:yt('nordic curl negatives')},
       {t:'Single-leg glute bridge — 10/side',       v:yt('single leg glute bridge')},
-      {t:'Banded clamshells — 15/side',             v:yt('banded clamshell glute med')},
       {t:'Myrtle routine — both sides',             v:yt('myrtle routine hip mobility'), notes:[
         '1. Clams — 8/side',
         '2. Lateral leg raise — 8 neutral · 8 hips up · 8 hips down',
@@ -578,10 +629,10 @@ const DAYS = [
     ],
     exercises:[
       {id:'E_sdp', name:'Standing DB overhead press', target:'4×8', hasW:true},
-      {id:'E_rpf', name:'Reverse pec fly machine',    target:'3×12', hasW:true},
-      {id:'E_lr',  name:'Lateral raise',              target:'4×15', hasW:true},
-      {id:'E_hc',  name:'Hammer curl',                target:'3×12', hasW:true},
       {id:'E_sat', name:'Single-arm overhead tricep extension', target:'3×10', hasW:true},
+      {id:'E_lr',  name:'Cable lateral raise',        target:'4×15', hasW:true},
+      {id:'E_hc',  name:'Cable hammer curl',          target:'3×12', hasW:true},
+      {id:'E_rpf', name:'Reverse pec fly machine',    target:'3×12', hasW:true},
       {id:'E_tem', name:'Tricep extension machine',   target:'3×10', hasW:true},
     ],
     finisher:[
@@ -596,7 +647,7 @@ const DAYS = [
 
 // ── EX CONFIG ──────────────────────────────────────────────────────────────
 const EX_CONFIG = {
-  A_sq:   {start:40,  inc:5,    rest:180, homeAlt:null},
+  A_sq:   {start:40,  inc:5,    rest:180, homeAlt:null, ramp:true},
   A_bss:  {start:10,  inc:2.5,  rest:90,  homeAlt:null},
   A_lp:   {start:60,  inc:5,    rest:90,  homeAlt:'Extra set Bulgarian split squat (no leg press at home)', skip_home:true},
   A_lsu:  {start:10,  inc:2.5,  rest:90,  homeAlt:null},
@@ -604,29 +655,30 @@ const EX_CONFIG = {
   B_row:  {start:30,  inc:2.5,  rest:180, homeAlt:null},
   B_pu:   {start:0,   inc:0,    rest:120, repProg:true, homeAlt:'DB seal row — chest on bench, row DB each side', skip_home:true, note:'Bodyweight — hit 6 clean reps all 3 sets to add a rep next session'},
   B_dbr:  {start:12,  inc:2.5,  rest:90,  homeAlt:null},
-  B_clh:  {start:5,   inc:2.5,  rest:60,  homeAlt:'Resistance band low-to-high pull — 3×12', skip_home:false},
-  B_dsr:  {start:15,  inc:2.5,  rest:60,  homeAlt:'Bent-over DB row, wide elbows — no diverging row machine at home', skip_home:true},
-  B_sat:  {start:8,   inc:2.5,  rest:60,  homeAlt:'Single-arm DB overhead triceps extension — no machine at home', skip_home:true},
-  B_zc:   {start:8,   inc:2.5,  rest:60,  homeAlt:'Zottman curl — dumbbell, no machine at home', skip_home:true},
+  B_clh:  {start:5,   inc:2.3,  rest:60,  homeAlt:'Resistance band low-to-high pull — 3×12', skip_home:false},
+  B_dsr:  {start:23,  inc:7,    rest:60,  homeAlt:'Bent-over DB row, wide elbows — no diverging row machine at home', skip_home:true},
+  B_sat:  {start:9,   inc:2.3,  rest:60,  homeAlt:'Band tricep pushdown — anchor band high, no cable at home', skip_home:true},
+  B_zc:   {start:9,   inc:4.5,  rest:60,  homeAlt:'Zottman curl — dumbbell, no machine at home', skip_home:true},
+  B_rgc:  {start:9,   inc:2.3,  rest:60,  homeAlt:'Reverse-grip DB curl — no cable at home', skip_home:true},
   C_blw:  {start:0,   inc:0,    rest:60,  homeAlt:null},
   C_cop:  {start:0,   inc:0,    rest:60,  homeAlt:null, stageProg:'C_cop'},
-  C_gma:  {start:20,  inc:5,    rest:60,  homeAlt:'Side-lying hip abduction — 3×15/side (bodyweight)', skip_home:true},
+  C_gma:  {start:18,  inc:7,    rest:60,  homeAlt:'Side-lying hip abduction — 3×15/side (bodyweight)', skip_home:true},
   C_db:   {start:0,   inc:0,    rest:60,  homeAlt:null},
   C_pp:   {start:0,   inc:0,    rest:60,  homeAlt:'Anchor band to squat rack upright for Pallof press'},
   C_sc:   {start:16,  inc:2.5,  rest:60,  homeAlt:null},
   C_rkc:  {start:0,   inc:0,    rest:60,  homeAlt:null},
-  D_td:   {start:50,  inc:5,    rest:180, homeAlt:null},
+  D_td:   {start:50,  inc:5,    rest:180, homeAlt:null, ramp:true},
   D_rdl:  {start:30,  inc:5,    rest:90,  homeAlt:null},
   D_nc:   {start:0,   inc:0,    rest:180, homeAlt:null, stageProg:'D_nc'},
   D_slrdl:{start:10,  inc:2.5,  rest:90,  homeAlt:null},
-  D_lc:   {start:0,   inc:0,    rest:60,  homeAlt:'Nordic curl (already in program) or DB Romanian deadlift', skip_home:true},
+  D_lc:   {start:23,  inc:4.5,  rest:60,  homeAlt:'Nordic curl (already in program) or DB Romanian deadlift', skip_home:true},
   D_cp:   {start:40,  inc:5,    rest:60,  homeAlt:'Standing calf raise — bodyweight or holding DBs', skip_home:true},
   E_sdp:  {start:10,  inc:2.5,  rest:120, homeAlt:null},
-  E_rpf:  {start:15,  inc:2.5,  rest:60,  homeAlt:'DB rear delt fly — bent over, 3×12', skip_home:true},
-  E_lr:   {start:6,   inc:1.25, rest:60,  homeAlt:null},
-  E_hc:   {start:8,   inc:2.5,  rest:60,  homeAlt:null},
+  E_rpf:  {start:18,  inc:7,    rest:60,  homeAlt:'DB rear delt fly — bent over, 3×12', skip_home:true},
+  E_lr:   {start:5,   inc:2.3,  rest:60,  homeAlt:'DB lateral raise — no cable at home', skip_home:true},
+  E_hc:   {start:5,   inc:2.3,  rest:60,  homeAlt:'DB hammer curl — no cable at home', skip_home:true},
   E_sat:  {start:8,   inc:2.5,  rest:60,  homeAlt:null},
-  E_tem:  {start:8,   inc:2.5,  rest:60,  homeAlt:'Single-arm DB overhead triceps extension (already in session) — no machine at home', skip_home:true},
+  E_tem:  {start:9,   inc:4.5,  rest:60,  homeAlt:'Single-arm DB overhead triceps extension (already in session) — no machine at home', skip_home:true},
   E_sdh:  {start:0,   inc:0,    rest:60,  timeProg:true, startSec:15, incSec:5, maxSec:30},
 };
 
@@ -641,8 +693,9 @@ const EX_VIDEO = {
   B_dbr:  ytS('single arm dumbbell row'),
   B_clh:  ytS('cable low to high pull rear delt'),
   B_dsr:  ytS('diverging seated row machine form'),
-  B_sat:  ytS('single arm overhead triceps extension dumbbell'),
+  B_sat:  ytS('reverse grip cable pushdown triceps'),
   B_zc:   ytS('bicep curl machine form'),
+  B_rgc:  ytS('reverse grip cable curl forearm'),
   C_blw:  ytS('banded lateral walk glute med'),
   C_cop:  ytS('copenhagen plank'),
   C_gma:  ytS('seated hip abduction machine glute med'),
@@ -658,8 +711,8 @@ const EX_VIDEO = {
   D_cp:   ytS('calf press machine form'),
   E_sdp:  ytS('standing dumbbell overhead press form'),
   E_rpf:  ytS('reverse pec fly machine rear delt'),
-  E_lr:   ytS('lateral raise form'),
-  E_hc:   ytS('hammer curl form'),
+  E_lr:   ytS('cable lateral raise form'),
+  E_hc:   ytS('cable hammer curl rope form'),
   E_sat:  ytS('single arm overhead triceps extension dumbbell'),
   E_tem:  ytS('tricep extension machine form'),
 };
@@ -668,8 +721,9 @@ const SCHEDULE = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 const SCHEDULE_DAYS = {Mon:'A',Tue:'B',Wed:'C',Thu:'D',Fri:'E',Sat:null,Sun:null};
 
 // ── STATE ──────────────────────────────────────────────────────────────────
-let currentDay=null, homeGym=false;
+let currentDay=null, homeGym=false, keepAwake=true;
 let sessions={}, checks={}, skipped={}, history={}, progression={};
+let exNotes={};
 let openCharts={}, chartTabs={};
 let editCtx=null;
 
@@ -687,7 +741,7 @@ function loadL(k){try{const v=localStorage.getItem(sk(k));return v?JSON.parse(v)
 function saveAll(){
   saveL('sessions',sessions); saveL('checks',checks); saveL('skipped',skipped);
   saveL('history',history); saveL('progression',progression); saveL('homeGym',homeGym);
-  saveL('timerDur',timerDur);
+  saveL('timerDur',timerDur); saveL('exNotes',exNotes); saveL('keepAwake',keepAwake);
   const b=document.getElementById('bwInput'); if(b&&b.value) saveL('bw',b.value);
 }
 function loadAll(){
@@ -695,6 +749,8 @@ function loadAll(){
   skipped=loadL('skipped')||{}; history=loadL('history')||{};
   progression=loadL('progression')||{}; homeGym=loadL('homeGym')||false;
   timerDur=loadL('timerDur')||120; timerLeft=timerDur;
+  exNotes=loadL('exNotes')||{};
+  keepAwake=loadL('keepAwake'); if(keepAwake===null) keepAwake=true;
   const bw=loadL('bw'); const el=document.getElementById('bwInput');
   if(bw&&el) el.value=bw;
 }
@@ -712,6 +768,8 @@ function exportData(){
   a.download='workout-backup-'+todayStr()+'.json';
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+  saveL('lastBackup',todayStr());
+  renderHome();
 }
 document.getElementById('importFile').addEventListener('change',function(){
   const f=this.files[0]; this.value=''; if(!f) return;
@@ -793,6 +851,18 @@ function parseTarget(t){
   return {sets:+m[1],lo,hi,unit};
 }
 
+// ── WARM-UP RAMP SETS (heavy lifts only — display only, never logged) ──────
+function rampSteps(w){
+  const BAR=20;
+  if(!w||w<=BAR+2.5) return null;          // too light to need a ramp
+  const steps=[{w:BAR,r:10,lbl:'bar'}];
+  const r2_5=v=>Math.round(v/2.5)*2.5;   // plate-friendly rounding
+  const s60=r2_5(w*0.6), s80=r2_5(w*0.8);
+  if(s60>BAR+2) steps.push({w:s60,r:5,lbl:s60+' kg'});
+  if(s80>s60+2&&s80<w) steps.push({w:s80,r:3,lbl:s80+' kg'});
+  return steps;
+}
+
 // ── PROGRESSION ────────────────────────────────────────────────────────────
 function getP(exId){
   if(!progression[exId]){const c=EX_CONFIG[exId]||{start:0};progression[exId]={w:c.start,fail:0,done:false};}
@@ -821,7 +891,15 @@ function applyProgression(exId,sets){
   const hi=parseTarget(ex.target).hi;
   const allTop=logged.every(s=>num(s.reps)>=hi);
   const missed=logged.some(s=>num(s.reps)<lo);
-  if(allTop){p.fail=0;p.w=round25(p.w+cfg.inc);}
+  if(allTop){
+    p.fail=0;
+    // Base next weight on the HEAVIEST set where target reps were hit,
+    // not the old suggestion — so logging a heavier weight is respected.
+    const successWeights=logged.filter(s=>num(s.reps)>=hi).map(s=>num(s.weight));
+    const topSet=successWeights.length?Math.max.apply(null,successWeights):p.w;
+    const base=Math.max(topSet,0)||p.w;
+    p.w=round25(base+cfg.inc);
+  }
   else if(missed){p.fail++;if(p.fail>=2){p.w=Math.max(cfg.start||0,round25(p.w*0.9));p.fail=0;}}
 }
 
@@ -846,7 +924,12 @@ function getNote(exId,sets){
   if(!cfg.inc) return null;
   const allTop=logged.every(s=>num(s.reps)>=hi);
   const missed=logged.some(s=>num(s.reps)<lo);
-  if(allTop) return {type:'bump',msg:'All sets hit — +'+cfg.inc+' kg next session'};
+  if(allTop){
+    const successWeights=logged.filter(s=>num(s.reps)>=hi).map(s=>num(s.weight));
+    const topSet=successWeights.length?Math.max.apply(null,successWeights):p.w;
+    const nextW=round25((Math.max(topSet,0)||p.w)+cfg.inc);
+    return {type:'bump',msg:'All sets hit — '+nextW+' kg next session'};
+  }
   if(missed&&p.fail>=1) return {type:'drop',msg:'Missed reps again — weight drops ~10% next session'};
   if(missed) return {type:'hold',msg:'Missed reps — holding weight next session'};
   return {type:'hold',msg:'Good — hold weight, aim for '+hi+' next session'};
@@ -1004,6 +1087,22 @@ function renderHome(){
       '</div>'+
     '</button>';
   }).join('');
+
+  // Backup nudge
+  const bn=document.getElementById('backupNudge');
+  if(bn){
+    const lb=loadL('lastBackup');
+    const hasHist=Object.keys(history).some(k=>(history[k]||[]).length);
+    if(!lb){
+      bn.textContent=hasHist?'⚠️ No backup yet — your history lives only on this phone':'';
+      bn.style.color='#fbbf24';
+    }else{
+      const days=Math.max(0,Math.round((Date.now()-new Date(lb+'T00:00:00').getTime())/86400000));
+      const stale=days>=14;
+      bn.textContent='Last backup: '+(days===0?'today':days===1?'yesterday':days+' days ago')+(stale?' — tap ⬇ Backup':'');
+      bn.style.color=stale?'#fbbf24':'var(--text3)';
+    }
+  }
 }
 
 // ── OPEN/CLOSE DAY ─────────────────────────────────────────────────────────
@@ -1018,11 +1117,13 @@ function openDay(id){
   document.getElementById('timerBar').style.display='flex';
   updateTimerUI();
   document.getElementById('wkBody').scrollTop=0;
+  acquireWake();
 }
 
 function goHome(){
   showScreen('screenHome');
   document.getElementById('timerBar').style.display='none';
+  releaseWake();
 }
 
 // ── RENDER WORKOUT ─────────────────────────────────────────────────────────
@@ -1039,10 +1140,16 @@ function renderWorkout(){
 
   let h='';
 
-  // Home gym toggle
-  h+='<div style="padding:12px 14px 6px;display:flex;align-items:center;justify-content:space-between">'+
-    '<div style="font-size:13px;color:var(--text2)">🏠 Home gym</div>'+
-    '<button class="hg-toggle'+(homeGym?' on':'')+'" onclick="toggleHG()">'+(homeGym?'ON':'OFF')+'</button>'+
+  // Home gym + keep-screen-on toggles
+  h+='<div style="padding:12px 14px 6px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">'+
+    '<div style="display:flex;align-items:center;gap:8px">'+
+      '<span style="font-size:13px;color:var(--text2)">🏠 Home gym</span>'+
+      '<button class="hg-toggle'+(homeGym?' on':'')+'" onclick="toggleHG()">'+(homeGym?'ON':'OFF')+'</button>'+
+    '</div>'+
+    '<div style="display:flex;align-items:center;gap:8px">'+
+      '<span style="font-size:13px;color:var(--text2)">🔆 Screen on</span>'+
+      '<button class="hg-toggle'+(keepAwake?' on':'')+'" onclick="toggleAwake()">'+(keepAwake?'ON':'OFF')+'</button>'+
+    '</div>'+
   '</div>';
 
   if(vol>0) h+='<div class="vol-strip"><span class="vol-chip">⚡ '+vol.toLocaleString()+' kg volume</span></div>';
@@ -1091,6 +1198,12 @@ function renderWorkout(){
         '</div>'+
         (cfg.homeAlt&&homeGym&&autoSkip?'<div style="font-size:12px;color:#38bdf8;margin-top:6px;line-height:1.4">🏠 Sub: '+esc(cfg.homeAlt)+'</div>':'')+
         (cfg.homeAlt&&homeGym&&!autoSkip?'<div style="font-size:12px;color:#38bdf8;margin-top:6px">🏠 Note: '+esc(cfg.homeAlt)+'</div>':'')+
+        (exNotes[ex.id]?
+          '<div onclick="editNote(\''+ex.id+'\')" style="display:flex;align-items:flex-start;gap:6px;margin-top:7px;padding:7px 9px;background:rgba(251,191,36,0.1);border-left:2px solid #fbbf24;border-radius:4px;cursor:pointer">'+
+            '<span style="font-size:12px">📝</span>'+
+            '<span style="font-size:12px;color:#fbbf24;line-height:1.4;flex:1">'+esc(exNotes[ex.id])+'</span>'+
+          '</div>'
+          :'<button onclick="editNote(\''+ex.id+'\')" style="margin-top:7px;font-size:11px;color:var(--text3);background:none;border:none;padding:2px 0">+ add note</button>')+
       '</div>';
 
     if(!isSkipped){
@@ -1119,6 +1232,14 @@ function renderWorkout(){
             '<button onclick="advanceStage(\''+ex.id+'\')" style="margin-top:10px;width:100%;padding:10px;border-radius:var(--radius-sm);background:'+accent+';color:#0d0d0d;font-size:13px;font-weight:700;border:none;cursor:pointer">✓ Stage complete — unlock next</button>':
             '<div style="margin-top:8px;font-size:11px;color:'+accent+'">🏆 Final stage — keep building reps</div>'
           )+
+        '</div>';
+      }
+
+      if(cfg.ramp&&ex.hasW&&sw){
+        const steps=rampSteps(sw);
+        if(steps) h+='<div style="margin:0 13px 8px;padding:8px 12px;background:var(--bg3);border-radius:var(--radius-sm)">'+
+          '<div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">Ramp — not logged</div>'+
+          '<div style="font-size:13px;color:var(--text2)">'+steps.map(s=>s.lbl+' ×'+s.r).join(' → ')+' → working sets</div>'+
         '</div>';
       }
 
@@ -1231,10 +1352,17 @@ function chkRow(item,idx,done){
     '<div style="margin-top:8px;padding:8px 10px;background:var(--bg3);border-radius:var(--radius-sm);border-left:2px solid var(--border2)">'+
       notes.map(n=>'<div style="font-size:12px;color:var(--text2);padding:2px 0;line-height:1.4">'+esc(n)+'</div>').join('')+
     '</div>':'';
-  // Timed items get a start button instead of ticking directly
-  const startBtn=timedSec?
-    '<button class="tbtn pri" style="font-size:12px;padding:8px 12px;flex-shrink:0;margin-left:8px;align-self:flex-start" '+
-      'onclick="event.stopPropagation();startTimedCheck('+idx+','+timedSec+',\''+esc(label)+'\')">'+timedSec+'s ▶</button>':'';
+  // Timed items get a start button instead of ticking directly.
+  // Option B: show which rep is next when an item has multiple reps.
+  let startBtn='';
+  if(timedSec){
+    const totalReps=timedCheckReps(label);
+    const doneReps=timedCheckState[idx]||0;
+    const nextRep=Math.min(doneReps+1,totalReps);
+    const repLabel=totalReps>1?(' · '+nextRep+'/'+totalReps):'';
+    startBtn='<button class="tbtn pri" style="font-size:12px;padding:8px 12px;flex-shrink:0;margin-left:8px;align-self:flex-start" '+
+      'onclick="event.stopPropagation();startTimedCheck('+idx+','+timedSec+',\''+esc(label)+'\')">'+timedSec+'s ▶'+repLabel+'</button>';
+  }
   return '<div class="chk-item'+(done?' done':'')+'" onclick="toggleCheck('+idx+')" style="justify-content:space-between;align-items:flex-start">'+
     '<div style="flex:1;min-width:0">'+
       '<div style="display:flex;align-items:center;gap:11px">'+
@@ -1252,6 +1380,22 @@ function chkRow(item,idx,done){
 
 // ── ACTIONS ────────────────────────────────────────────────────────────────
 function toggleHG(){homeGym=!homeGym;saveAll();renderWorkout();}
+
+function toggleAwake(){
+  keepAwake=!keepAwake;
+  if(keepAwake) acquireWake(); else releaseWake();
+  saveAll(); renderWorkout();
+}
+
+function editNote(exId){
+  const ex=findEx(exId);
+  const current=exNotes[exId]||'';
+  const val=prompt('Note for '+(ex?ex.name:'exercise')+' (e.g. form cue, seat setting, injury flag). Leave blank to clear:', current);
+  if(val===null) return; // cancelled
+  const trimmed=val.trim();
+  if(trimmed) exNotes[exId]=trimmed; else delete exNotes[exId];
+  saveAll(); renderWorkout();
+}
 
 function toggleCheck(idx){
   if(!checks[currentDay]) checks[currentDay]={};
@@ -1347,6 +1491,19 @@ function commitEdit(){
 }
 document.getElementById('stepVal').addEventListener('input',commitEdit);
 function closeSheet(){
+  // fat-finger guard: flag weights way above anything seen for this exercise
+  if(editCtx&&editCtx.field==='weight'){
+    const inp=document.getElementById('stepVal');
+    const v=num(inp.value);
+    const hist=history[editCtx.exId]||[];
+    const ref=Math.max(getSuggestedW(editCtx.exId)||0,
+      hist.length?Math.max.apply(null,hist.map(x=>x.weight)):0);
+    if(ref>0&&v>ref*1.5&&v-ref>5){
+      if(!confirm(v+' kg is well above your usual '+ref+' kg for this exercise.\nKeep '+v+' kg?')){
+        inp.value=ref;
+      }
+    }
+  }
   commitEdit();
   editCtx=null;
   document.getElementById('sheetBack').classList.remove('open');
@@ -1390,6 +1547,8 @@ function startRest(dur){
   timerEnd=Date.now()+dur*1000;
   timerLeft=dur;
   timerRunning=true;
+  ensureNotifPerm();
+  scheduleRestAlarm();
   runTicker();
   updateTimerUI();
 }
@@ -1398,10 +1557,13 @@ function toggleTimer(){
     timerLeft=Math.max(0,remaining());
     timerRunning=false;
     clearInterval(timerIv);
+    cancelRestAlarm();
   }else{
     if(timerLeft<=0) timerLeft=timerDur;
     timerEnd=Date.now()+timerLeft*1000;
     timerRunning=true;
+    ensureNotifPerm();
+    scheduleRestAlarm();
     runTicker();
   }
   updateTimerUI();
@@ -1409,11 +1571,13 @@ function toggleTimer(){
 function resetTimer(){
   timerRunning=false; clearInterval(timerIv);
   timerLeft=timerDur;
+  cancelRestAlarm();
   updateTimerUI();
 }
 function timerAux(){
   if(timerRunning){                   // running: +30s
     timerEnd+=30000;
+    scheduleRestAlarm();
   }else{                              // idle: cycle rest length
     const i=TIMER_PRESETS.indexOf(timerDur);
     timerDur=TIMER_PRESETS[(i+1)%TIMER_PRESETS.length]||120;
@@ -1429,6 +1593,7 @@ function runTicker(){
     if(remaining()<=0){
       timerRunning=false; clearInterval(timerIv);
       timerLeft=timerDur;
+      cancelRestAlarm();   // page handled it — close/cancel the system notification
       timerDone();
     }
     updateTimerUI();
@@ -1442,17 +1607,19 @@ function timerDone(){
 }
 let audioCtx=null;
 function beep(){
+  // Loud + long for a tiny phone speaker: 6 pulses over ~2 s, square wave
+  // (harmonics cut through gym noise better than sine), near-max gain.
   try{
     if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)();
-    [0,0.25,0.5].forEach((t,i)=>{
+    [0,0.35,0.7,1.05,1.4,1.75].forEach((t,i)=>{
       const o=audioCtx.createOscillator(),g=audioCtx.createGain();
       o.connect(g); g.connect(audioCtx.destination);
-      o.frequency.value=i===2?1320:880; o.type='sine';
+      o.frequency.value=i>=4?1568:i%2?1175:880; o.type='square';
       const s=audioCtx.currentTime+t;
       g.gain.setValueAtTime(0.001,s);
-      g.gain.exponentialRampToValueAtTime(0.4,s+0.02);
-      g.gain.exponentialRampToValueAtTime(0.001,s+0.18);
-      o.start(s); o.stop(s+0.2);
+      g.gain.exponentialRampToValueAtTime(0.85,s+0.02);
+      g.gain.exponentialRampToValueAtTime(0.001,s+0.28);
+      o.start(s); o.stop(s+0.3);
     });
   }catch(e){}
 }
@@ -1462,7 +1629,191 @@ function updateTimerUI(){
   if(b) b.textContent=timerRunning?'pause':'start';
   if(a) a.textContent=timerRunning?'+30s':fmtT(timerDur);
 }
-document.addEventListener('visibilitychange',()=>{if(!document.hidden)updateTimerUI();});
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden) return;
+  updateTimerUI();
+  // catch-up: if the timer expired while the page was suspended, fire feedback now
+  if(timerRunning&&remaining()<=0){
+    timerRunning=false; clearInterval(timerIv);
+    timerLeft=timerDur;
+    cancelRestAlarm();
+    timerDone();
+  }
+  // re-acquire wake lock if still in a workout (released automatically on lock)
+  if(document.getElementById('screenWorkout').classList.contains('active')) acquireWake();
+});
+
+// ── SYSTEM NOTIFICATION AT TIMER END (works with screen locked) ────────────
+// The rest timer itself is timestamp-based, but JS is suspended when the
+// screen locks, so the beep can't fire. We hand the alarm to the service
+// worker, which shows a system notification (sound + vibration) at the end
+// time. If the page is still running it beeps itself and cancels the alarm
+// (the alarm is scheduled 1.5 s late to give the page first go).
+let notifAsked=false;
+function ensureNotifPerm(){
+  try{
+    if(!('Notification' in window)||!('serviceWorker' in navigator)) return;
+    if(Notification.permission==='default'&&!notifAsked){
+      notifAsked=true;
+      Notification.requestPermission().catch(()=>{});
+    }
+  }catch(e){}
+}
+function swMsg(msg){
+  try{
+    if(!('serviceWorker' in navigator)) return;
+    navigator.serviceWorker.ready.then(reg=>{if(reg.active)reg.active.postMessage(msg);}).catch(()=>{});
+  }catch(e){}
+}
+function scheduleRestAlarm(){
+  if(!('Notification' in window)||Notification.permission!=='granted') return;
+  swMsg({type:'schedule-rest-alarm',fireAt:timerEnd+1500});
+}
+function cancelRestAlarm(){
+  swMsg({type:'cancel-rest-alarm'});
+}
+
+// ── SCREEN WAKE LOCK (keeps display on during a workout) ───────────────────
+let wakeLock=null;
+async function acquireWake(){
+  try{
+    if(!keepAwake) return;   // user toggled screen-on off (battery saver)
+    if(!('wakeLock' in navigator)||wakeLock) return;
+    wakeLock=await navigator.wakeLock.request('screen');
+    wakeLock.addEventListener('release',()=>{wakeLock=null;});
+  }catch(e){}
+}
+function releaseWake(){
+  if(wakeLock){try{wakeLock.release();}catch(e){} wakeLock=null;}
+}
+
+// ── STATS SCREEN ───────────────────────────────────────────────────────────
+let statsEx=null;
+function openStats(){statsEx=null;showScreen('screenStats');}
+function statsBack(){
+  if(statsEx){statsEx=null;renderStats();}
+  else showScreen('screenHome');
+}
+function exDay(exId){for(const d of DAYS){if(d.exercises.some(x=>x.id===exId))return d;}return null;}
+
+function renderStats(){
+  const body=document.getElementById('statsBody');
+  const title=document.getElementById('statsTitle');
+  const sub=document.getElementById('statsSub');
+
+  // ── list view ──
+  if(!statsEx){
+    title.textContent='Stats';
+    let h='',any=false;
+    DAYS.forEach(d=>{
+      const rows=d.exercises.map(ex=>{
+        const hist=history[ex.id]||[];
+        if(!hist.length) return '';
+        any=true;
+        const best=Math.max.apply(null,hist.map(x=>x.weight*x.reps));
+        const bestE=hist.find(x=>x.weight*x.reps===best)||hist[hist.length-1];
+        const bestLbl=bestE.weight?bestE.weight+' kg × '+bestE.reps:bestE.reps+' reps';
+        return '<button class="day-btn" style="margin-bottom:8px" onclick="openStatsEx(\''+ex.id+'\')">'+
+          '<div class="day-btn-left">'+
+            '<div class="day-dot" style="background:'+d.color+'"></div>'+
+            '<div><div style="font-size:14px;font-weight:700">'+esc(ex.name)+'</div>'+
+            '<div class="day-sub-text">'+hist.length+' sets logged · best '+bestLbl+'</div></div>'+
+          '</div>'+
+          '<div style="color:var(--text3);font-size:18px">›</div>'+
+        '</button>';
+      }).join('');
+      if(rows) h+='<div class="sec-label" style="margin:8px 0;color:'+d.color+'">'+esc(d.label+' — '+d.title)+'</div>'+rows;
+    });
+    sub.textContent=any?'Tap an exercise for chart, PR & history':'No history yet';
+    body.innerHTML=any?h:'<div style="text-align:center;color:var(--text3);padding:50px 20px;line-height:1.6">Nothing here yet.<br>Save a workout and your history will show up.</div>';
+    return;
+  }
+
+  // ── detail view ──
+  const ex=findEx(statsEx);
+  const d=exDay(statsEx);
+  const color=d?d.color:'#a3e635';
+  const hist=history[statsEx]||[];
+  title.textContent=ex?ex.name:statsEx;
+  sub.textContent=(d?d.label+' · ':'')+hist.length+' sets logged';
+
+  let h='';
+  if(hist.length){
+    const best=Math.max.apply(null,hist.map(x=>x.weight*x.reps));
+    const bestE=hist.find(x=>x.weight*x.reps===best)||hist[hist.length-1];
+    const maxW=Math.max.apply(null,hist.map(x=>x.weight));
+    h+='<div style="display:flex;gap:8px;margin-bottom:12px">'+
+      '<div style="flex:1;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:12px">'+
+        '<div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em">🏆 Best set</div>'+
+        '<div style="font-size:19px;font-weight:700;margin-top:3px;color:'+color+'">'+(bestE.weight?bestE.weight+' kg × '+bestE.reps:bestE.reps+' reps')+'</div>'+
+        '<div style="font-size:11px;color:var(--text3);margin-top:2px">'+esc(bestE.date)+'</div>'+
+      '</div>'+
+      (maxW>0?'<div style="flex:1;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:12px">'+
+        '<div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em">Heaviest</div>'+
+        '<div style="font-size:19px;font-weight:700;margin-top:3px">'+maxW+' kg</div>'+
+      '</div>':'')+
+    '</div>';
+    // Next-session weight — editable, so a deleted mis-log can't leave a bad suggestion
+    if(ex&&ex.hasW){
+      h+='<button onclick="editNextW(\''+statsEx+'\')" style="width:100%;display:flex;align-items:center;justify-content:space-between;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin-bottom:12px;text-align:left">'+
+        '<div>'+
+          '<div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em">Next session loads at</div>'+
+          '<div style="font-size:19px;font-weight:700;margin-top:3px;color:'+color+'">'+getSuggestedW(statsEx)+' kg</div>'+
+        '</div>'+
+        '<div style="font-size:13px;color:var(--text2)">✎ edit</div>'+
+      '</button>';
+    }
+
+    if(hist.length>1){
+      const tab=chartTabs[statsEx]||'volume';
+      h+='<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin-bottom:12px">'+
+        '<div class="chart-tabs">'+
+          ['volume','weight','reps'].map(t=>'<button class="ctab'+(tab===t?' on':'')+'" onclick="setStatsTab(\''+statsEx+'\',\''+t+'\')">'+t+'</button>').join('')+
+        '</div>'+
+        chartSVG(statsEx,color)+
+      '</div>';
+    }
+
+    // history list — newest first, with delete to fix mis-logs
+    h+='<div class="sec-label" style="margin-bottom:8px">History — tap ✕ to delete a mis-log</div>';
+    const start=Math.max(0,hist.length-50);
+    for(let i=hist.length-1;i>=start;i--){
+      const e=hist[i];
+      h+='<div style="display:flex;align-items:center;gap:10px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:6px">'+
+        '<div style="flex:1;min-width:0">'+
+          '<span style="font-size:15px;font-weight:700">'+(e.weight?e.weight+' kg × '+e.reps:e.reps+' reps')+'</span>'+
+          '<span style="font-size:11px;color:var(--text3);margin-left:8px">'+esc(e.date)+'</span>'+
+        '</div>'+
+        '<button onclick="delHist(\''+statsEx+'\','+i+')" style="width:36px;height:36px;border-radius:50%;border:1px solid rgba(244,63,94,.35);color:#f43f5e;font-size:14px;flex-shrink:0">✕</button>'+
+      '</div>';
+    }
+    if(start>0) h+='<div style="text-align:center;font-size:11px;color:var(--text3);padding:8px">Showing last 50 of '+hist.length+'</div>';
+  }
+  body.innerHTML=h;
+}
+function openStatsEx(exId){statsEx=exId;renderStats();document.getElementById('statsBody').scrollTop=0;}
+function setStatsTab(exId,tab){chartTabs[exId]=tab;renderStats();}
+function editNextW(exId){
+  const ex=findEx(exId);
+  const p=getP(exId);
+  const val=prompt('Weight (kg) to load next session for '+(ex?ex.name:exId)+':',p.w);
+  if(val===null) return;
+  const v=num(val);
+  if(v<0||v>500){alert("That doesn't look right — not saved.");return;}
+  p.w=round25(v);
+  p.fail=0;
+  saveAll(); renderStats();
+}
+function delHist(exId,i){
+  const h=history[exId]||[];
+  const e=h[i]; if(!e) return;
+  if(!confirm('Delete this entry?\n'+e.date+' — '+(e.weight?e.weight+' kg × ':'')+e.reps+(e.weight?'':' reps'))) return;
+  h.splice(i,1);
+  if(!h.length) delete history[exId];
+  saveAll();
+  if(!history[exId]) statsEx=null;
+  renderStats();
+}
 
 // ── PIN LOCK ───────────────────────────────────────────────────────────────
 // PIN is stored hashed (not plaintext) in localStorage. First launch sets it.
@@ -1550,6 +1901,9 @@ function showPinLock(){
   lock.style.display='flex';
 }
 function unlockApp(){
+  // remember the unlock for this launch only — sessionStorage survives
+  // reloads but is cleared when the app/tab fully closes
+  try{sessionStorage.setItem('wt5_unlocked','1');}catch(e){}
   document.getElementById('pinLock').style.display='none';
   // run the normal init now that we're unlocked
   loadAll();
@@ -1557,10 +1911,19 @@ function unlockApp(){
   renderHome();
   updateTimerUI();
 }
+function sessionUnlocked(){
+  try{return sessionStorage.getItem('wt5_unlocked')==='1';}catch(e){return false;}
+}
 
 // ── INIT ───────────────────────────────────────────────────────────────────
 document.getElementById('bwInput').addEventListener('change',()=>saveAll());
-showPinLock();
+// Service worker: guaranteed offline + rest-timer notifications
+if('serviceWorker' in navigator){
+  try{navigator.serviceWorker.register('./sw.js');}catch(e){}
+}
+// PIN once per launch — skip the lock if already unlocked this session
+if(getStoredPin()&&sessionUnlocked()) unlockApp();
+else showPinLock();
 </script>
 </body>
 </html>
