@@ -143,15 +143,6 @@ a{color:inherit;text-decoration:none}
 .tbtn{padding:10px 13px;border-radius:var(--radius-sm);font-size:13px;font-weight:700;border:1px solid var(--border2);min-width:54px}
 .tbtn.pri{background:var(--text);color:var(--bg);border-color:transparent}
 
-/* PIN LOCK */
-.pindot{width:14px;height:14px;border-radius:50%;border:1.5px solid var(--border2);transition:background .12s}
-.pindot.on{background:var(--text);border-color:var(--text)}
-.pinkey{width:72px;height:72px;border-radius:50%;border:1px solid var(--border);background:var(--bg2);font-size:26px;font-weight:600;color:var(--text);display:flex;align-items:center;justify-content:center}
-.pinkey:active{background:var(--bg3)}
-.pinkey.blank{border:none;background:none}
-#pinLock.shake{animation:pinshake .4s}
-@keyframes pinshake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-9px)}40%,80%{transform:translateX(9px)}}
-
 /* HOME GYM */
 .hg-toggle{padding:6px 12px;border-radius:20px;font-size:12px;font-weight:700;border:1px solid rgba(56,189,248,.4);color:#38bdf8}
 .hg-toggle.on{background:#38bdf8;color:var(--bg)}
@@ -176,10 +167,6 @@ a{color:inherit;text-decoration:none}
 /* TINY SCREENS (Jelly 2 ≈ 320 CSS px wide, short) */
 @media (max-width:360px){
   body{font-size:14px}
-  .pinkey{width:58px;height:58px;font-size:22px}
-  #pinPad{grid-template-columns:repeat(3,58px)!important;gap:12px!important}
-  #pinLock{padding:16px}
-  #pinLock>div:first-child{font-size:34px;margin-bottom:4px}
   .tools-row{flex-wrap:wrap}
   .step-btn{width:54px;height:54px;font-size:24px}
   .step-val{width:84px;font-size:28px}
@@ -190,26 +177,10 @@ a{color:inherit;text-decoration:none}
   .set-tick{width:44px;height:44px}
   .home-title{font-size:21px}
 }
-@media (max-height:620px){
-  .pinkey{width:54px;height:54px;font-size:20px}
-  #pinPad{grid-template-columns:repeat(3,54px)!important;gap:10px!important}
-  #pinDots{margin-bottom:20px!important}
-}
 </style>
 </head>
 <body>
 
-<!-- PIN LOCK OVERLAY -->
-<div id="pinLock" style="display:none;position:fixed;inset:0;z-index:9999;background:var(--bg);flex-direction:column;align-items:center;justify-content:center;padding:24px">
-  <div style="font-size:46px;margin-bottom:8px">🏋️</div>
-  <div id="pinTitle" style="font-size:18px;font-weight:700;margin-bottom:4px">Enter PIN</div>
-  <div id="pinSub" style="font-size:13px;color:var(--text2);margin-bottom:26px;text-align:center;min-height:18px"></div>
-  <div id="pinDots" style="display:flex;gap:14px;margin-bottom:32px">
-    <div class="pindot"></div><div class="pindot"></div><div class="pindot"></div><div class="pindot"></div>
-  </div>
-  <div id="pinPad" style="display:grid;grid-template-columns:repeat(3,72px);gap:16px;justify-content:center"></div>
-  <button id="pinForgot" onclick="pinForgot()" style="margin-top:28px;font-size:12px;color:var(--text3);background:none;border:none">Forgotten PIN?</button>
-</div>
 
 <div class="screen active" id="screenHome">
   <div class="home-header">
@@ -527,10 +498,9 @@ const DAYS = [
       {id:'B_pu',  name:'Pull-up',                        target:'3×6', hasW:false},
       {id:'B_dbr', name:'Single-arm DB row',              target:'3×10', hasW:true},
       {id:'B_clh', name:'Cable low-to-high pull',         target:'3×12', hasW:true},
-      {id:'B_dsr', name:'Diverging seated row',           target:'3×12', hasW:true},
       {id:'B_sat', name:'Reverse-grip cable pushdown',     target:'3×10', hasW:true},
       {id:'B_rgc', name:'Reverse-grip cable curl',         target:'3×10', hasW:true},
-      {id:'B_zc',  name:'Bicep curl machine',             target:'3×10', hasW:true},
+      {id:'B_zc',  name:'Cable bicep curl',               target:'3×10', hasW:true},
     ],
     finisher:[
       {t:'Shoulder dislocates — 2×10',                         v:yt('shoulder dislocates band stick')},
@@ -597,8 +567,8 @@ const DAYS = [
       {id:'D_rdl',   name:'Deficit RDL',       target:'3×10', hasW:true},
       {id:'D_nc',    name:'Nordic curl',       target:'3×5', hasW:false},
       {id:'D_slrdl', name:'Single-leg RDL',    target:'3×10', hasW:true},
-      {id:'D_lc',    name:'Seated leg curl',   target:'3×12', hasW:true},
-      {id:'D_cp',    name:'Calf press',        target:'3×15', hasW:true},
+      {id:'D_lc',    name:'Prone leg curl',    target:'3×12', hasW:true},
+      {id:'D_cp',    name:'Calf press (on leg press)', target:'3×15', hasW:true},
     ],
     finisher:[
       {t:'Seated pancake stretch — 2×30 sec',       v:yt('seated pancake stretch flexibility')},
@@ -633,7 +603,7 @@ const DAYS = [
       {id:'E_lr',  name:'Cable lateral raise',        target:'4×15', hasW:true},
       {id:'E_hc',  name:'Cable hammer curl',          target:'3×12', hasW:true},
       {id:'E_rpf', name:'Reverse pec fly machine',    target:'3×12', hasW:true},
-      {id:'E_tem', name:'Tricep extension machine',   target:'3×10', hasW:true},
+      {id:'E_tem', name:'Cable tricep pushdown',      target:'3×10', hasW:true},
     ],
     finisher:[
       {t:'Bilateral dead hang — 2×30 sec',                              v:yt('dead hang spinal decompression'), timerSec:30},
@@ -649,20 +619,19 @@ const DAYS = [
 const EX_CONFIG = {
   A_sq:   {start:40,  inc:5,    rest:180, homeAlt:null, ramp:true},
   A_bss:  {start:10,  inc:2.5,  rest:90,  homeAlt:null},
-  A_lp:   {start:60,  inc:5,    rest:90,  homeAlt:'Extra set Bulgarian split squat (no leg press at home)', skip_home:true},
+  A_lp:   {start:60,  inc:9,    rest:90,  homeAlt:'Extra set Bulgarian split squat (no leg press at home)', skip_home:true},
   A_lsu:  {start:10,  inc:2.5,  rest:90,  homeAlt:null},
   A_atg:  {start:0,   inc:2.5,  rest:90,  homeAlt:null},
   B_row:  {start:30,  inc:2.5,  rest:180, homeAlt:null},
   B_pu:   {start:0,   inc:0,    rest:120, repProg:true, homeAlt:'DB seal row — chest on bench, row DB each side', skip_home:true, note:'Bodyweight — hit 6 clean reps all 3 sets to add a rep next session'},
   B_dbr:  {start:12,  inc:2.5,  rest:90,  homeAlt:null},
-  B_clh:  {start:5,   inc:2.3,  rest:60,  homeAlt:'Resistance band low-to-high pull — 3×12', skip_home:false},
-  B_dsr:  {start:23,  inc:7,    rest:60,  homeAlt:'Bent-over DB row, wide elbows — no diverging row machine at home', skip_home:true},
-  B_sat:  {start:9,   inc:2.3,  rest:60,  homeAlt:'Band tricep pushdown — anchor band high, no cable at home', skip_home:true},
-  B_zc:   {start:9,   inc:4.5,  rest:60,  homeAlt:'Zottman curl — dumbbell, no machine at home', skip_home:true},
-  B_rgc:  {start:9,   inc:2.3,  rest:60,  homeAlt:'Reverse-grip DB curl — no cable at home', skip_home:true},
+  B_clh:  {start:5,   inc:4.5,  rest:60,  homeAlt:'Resistance band low-to-high pull — 3×12', skip_home:false},
+  B_sat:  {start:9,   inc:4.5,  rest:60,  homeAlt:'Band tricep pushdown — anchor band high, no cable at home', skip_home:true},
+  B_zc:   {start:9,   inc:4.5,  rest:60,  homeAlt:'DB curl — no cable at home', skip_home:true},
+  B_rgc:  {start:9,   inc:4.5,  rest:60,  homeAlt:'Reverse-grip DB curl — no cable at home', skip_home:true},
   C_blw:  {start:0,   inc:0,    rest:60,  homeAlt:null},
   C_cop:  {start:0,   inc:0,    rest:60,  homeAlt:null, stageProg:'C_cop'},
-  C_gma:  {start:18,  inc:7,    rest:60,  homeAlt:'Side-lying hip abduction — 3×15/side (bodyweight)', skip_home:true},
+  C_gma:  {start:18,  inc:6.8,  rest:60,  homeAlt:'Side-lying hip abduction — 3×15/side (bodyweight)', skip_home:true},
   C_db:   {start:0,   inc:0,    rest:60,  homeAlt:null},
   C_pp:   {start:0,   inc:0,    rest:60,  homeAlt:'Anchor band to squat rack upright for Pallof press'},
   C_sc:   {start:16,  inc:2.5,  rest:60,  homeAlt:null},
@@ -671,14 +640,14 @@ const EX_CONFIG = {
   D_rdl:  {start:30,  inc:5,    rest:90,  homeAlt:null},
   D_nc:   {start:0,   inc:0,    rest:180, homeAlt:null, stageProg:'D_nc'},
   D_slrdl:{start:10,  inc:2.5,  rest:90,  homeAlt:null},
-  D_lc:   {start:23,  inc:4.5,  rest:60,  homeAlt:'Nordic curl (already in program) or DB Romanian deadlift', skip_home:true},
-  D_cp:   {start:40,  inc:5,    rest:60,  homeAlt:'Standing calf raise — bodyweight or holding DBs', skip_home:true},
+  D_lc:   {start:23,  inc:6.8,  rest:60,  homeAlt:'Nordic curl (already in program) or DB Romanian deadlift', skip_home:true},
+  D_cp:   {start:40,  inc:9,    rest:60,  homeAlt:'Standing calf raise — bodyweight or holding DBs', skip_home:true, note:'Done on the leg press — feet low on the platform, press through the balls of your feet. Weight is a guess; use ✎ edit on the Stats screen to correct it after your first session.'},
   E_sdp:  {start:10,  inc:2.5,  rest:120, homeAlt:null},
-  E_rpf:  {start:18,  inc:7,    rest:60,  homeAlt:'DB rear delt fly — bent over, 3×12', skip_home:true},
-  E_lr:   {start:5,   inc:2.3,  rest:60,  homeAlt:'DB lateral raise — no cable at home', skip_home:true},
-  E_hc:   {start:5,   inc:2.3,  rest:60,  homeAlt:'DB hammer curl — no cable at home', skip_home:true},
+  E_rpf:  {start:18,  inc:6.8,  rest:60,  homeAlt:'DB rear delt fly — bent over, 3×12', skip_home:true},
+  E_lr:   {start:5,   inc:4.5,  rest:60,  homeAlt:'DB lateral raise — no cable at home', skip_home:true},
+  E_hc:   {start:5,   inc:4.5,  rest:60,  homeAlt:'DB hammer curl — no cable at home', skip_home:true},
   E_sat:  {start:8,   inc:2.5,  rest:60,  homeAlt:null},
-  E_tem:  {start:9,   inc:4.5,  rest:60,  homeAlt:'Single-arm DB overhead triceps extension (already in session) — no machine at home', skip_home:true},
+  E_tem:  {start:5,   inc:4.5,  rest:60,  homeAlt:'Single-arm DB overhead triceps extension (already in session) — no cable at home', skip_home:true},
   E_sdh:  {start:0,   inc:0,    rest:60,  timeProg:true, startSec:15, incSec:5, maxSec:30},
 };
 
@@ -692,9 +661,8 @@ const EX_VIDEO = {
   B_pu:   ytS('pull up dead hang form'),
   B_dbr:  ytS('single arm dumbbell row'),
   B_clh:  ytS('cable low to high pull rear delt'),
-  B_dsr:  ytS('diverging seated row machine form'),
   B_sat:  ytS('reverse grip cable pushdown triceps'),
-  B_zc:   ytS('bicep curl machine form'),
+  B_zc:   ytS('standing cable bicep curl form'),
   B_rgc:  ytS('reverse grip cable curl forearm'),
   C_blw:  ytS('banded lateral walk glute med'),
   C_cop:  ytS('copenhagen plank'),
@@ -707,14 +675,14 @@ const EX_VIDEO = {
   D_rdl:  ytS('romanian deadlift form'),
   D_nc:   yt('nordic curl negatives'),
   D_slrdl:ytS('single leg rdl dumbbell'),
-  D_lc:   ytS('seated leg curl machine'),
-  D_cp:   ytS('calf press machine form'),
+  D_lc:   ytS('prone leg curl machine'),
+  D_cp:   ytS('calf raise on leg press machine'),
   E_sdp:  ytS('standing dumbbell overhead press form'),
   E_rpf:  ytS('reverse pec fly machine rear delt'),
   E_lr:   ytS('cable lateral raise form'),
   E_hc:   ytS('cable hammer curl rope form'),
   E_sat:  ytS('single arm overhead triceps extension dumbbell'),
-  E_tem:  ytS('tricep extension machine form'),
+  E_tem:  ytS('cable tricep pushdown form'),
 };
 
 const SCHEDULE = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
@@ -1815,115 +1783,16 @@ function delHist(exId,i){
   renderStats();
 }
 
-// ── PIN LOCK ───────────────────────────────────────────────────────────────
-// PIN is stored hashed (not plaintext) in localStorage. First launch sets it.
-// This protects data if the hosted link is found — it is NOT bank-grade
-// security, just a sensible barrier for a personal training log.
-let pinEntry='', pinStage='check', pinFirst='';
-
-function pinHash(s){
-  // simple FNV-1a hash — enough to avoid storing the PIN in plain text
-  let h=0x811c9dc5;
-  for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,0x01000193);}
-  return (h>>>0).toString(16);
-}
-function getStoredPin(){return loadL('pinHash');}
-
-function buildPinPad(){
-  const pad=document.getElementById('pinPad');
-  let h='';
-  for(let n=1;n<=9;n++) h+='<button class="pinkey" onclick="pinPress(\''+n+'\')">'+n+'</button>';
-  h+='<button class="pinkey blank"></button>';
-  h+='<button class="pinkey" onclick="pinPress(\'0\')">0</button>';
-  h+='<button class="pinkey" onclick="pinDel()" style="font-size:20px">⌫</button>';
-  pad.innerHTML=h;
-}
-function renderPinDots(){
-  document.querySelectorAll('.pindot').forEach((d,i)=>d.classList.toggle('on',i<pinEntry.length));
-}
-function pinPress(n){
-  if(pinEntry.length>=4) return;
-  pinEntry+=n;
-  renderPinDots();
-  if(pinEntry.length===4) setTimeout(pinSubmit,150);
-}
-function pinDel(){ pinEntry=pinEntry.slice(0,-1); renderPinDots(); }
-function pinShake(){
-  const el=document.getElementById('pinLock');
-  el.classList.add('shake'); setTimeout(()=>el.classList.remove('shake'),400);
-}
-function pinSubmit(){
-  if(pinStage==='check'){
-    if(pinHash(pinEntry)===getStoredPin()){ unlockApp(); }
-    else { pinShake(); pinEntry=''; renderPinDots(); document.getElementById('pinSub').textContent='Wrong PIN — try again'; }
-  } else if(pinStage==='set1'){
-    pinFirst=pinEntry; pinEntry=''; renderPinDots();
-    pinStage='set2';
-    document.getElementById('pinTitle').textContent='Confirm PIN';
-    document.getElementById('pinSub').textContent='Enter the same 4 digits again';
-  } else if(pinStage==='set2'){
-    if(pinEntry===pinFirst){
-      saveL('pinHash',pinHash(pinEntry));
-      unlockApp();
-    } else {
-      pinShake(); pinEntry=''; pinFirst=''; renderPinDots();
-      pinStage='set1';
-      document.getElementById('pinTitle').textContent='Set a PIN';
-      document.getElementById('pinSub').textContent="Didn't match — choose 4 digits";
-    }
-  }
-}
-function pinForgot(){
-  if(!confirm('Reset PIN? This ERASES all workout data and history — there is no other way to recover access.')) return;
-  if(!confirm('Are you sure? Everything will be wiped.')) return;
-  for(let i=localStorage.length-1;i>=0;i--){
-    const k=localStorage.key(i);
-    if(k&&k.startsWith(PREFIX)) localStorage.removeItem(k);
-  }
-  location.reload();
-}
-function showPinLock(){
-  const stored=getStoredPin();
-  const lock=document.getElementById('pinLock');
-  buildPinPad();
-  pinEntry=''; renderPinDots();
-  if(stored){
-    pinStage='check';
-    document.getElementById('pinTitle').textContent='Enter PIN';
-    document.getElementById('pinSub').textContent='';
-    document.getElementById('pinForgot').style.display='block';
-  } else {
-    pinStage='set1';
-    document.getElementById('pinTitle').textContent='Set a PIN';
-    document.getElementById('pinSub').textContent='Choose 4 digits to protect your data';
-    document.getElementById('pinForgot').style.display='none';
-  }
-  lock.style.display='flex';
-}
-function unlockApp(){
-  // remember the unlock for this launch only — sessionStorage survives
-  // reloads but is cleared when the app/tab fully closes
-  try{sessionStorage.setItem('wt5_unlocked','1');}catch(e){}
-  document.getElementById('pinLock').style.display='none';
-  // run the normal init now that we're unlocked
-  loadAll();
-  DAYS.forEach(d=>checkReset(d.id));
-  renderHome();
-  updateTimerUI();
-}
-function sessionUnlocked(){
-  try{return sessionStorage.getItem('wt5_unlocked')==='1';}catch(e){return false;}
-}
-
 // ── INIT ───────────────────────────────────────────────────────────────────
 document.getElementById('bwInput').addEventListener('change',()=>saveAll());
 // Service worker: guaranteed offline + rest-timer notifications
 if('serviceWorker' in navigator){
   try{navigator.serviceWorker.register('./sw.js');}catch(e){}
 }
-// PIN once per launch — skip the lock if already unlocked this session
-if(getStoredPin()&&sessionUnlocked()) unlockApp();
-else showPinLock();
+loadAll();
+DAYS.forEach(d=>checkReset(d.id));
+renderHome();
+updateTimerUI();
 </script>
 </body>
 </html>
