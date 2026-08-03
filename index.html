@@ -304,8 +304,7 @@ function startTimedSet(exId,si,durSec){
   timerLeft=durSec;
   timerEnd=Date.now()+durSec*1000;
   timerRunning=true;
-  ensureNotifPerm();
-  scheduleRestAlarm();
+  ensureNotifPerm().then(scheduleRestAlarm);
   // When done: tick set and restore rest timer
   const origDone=timerDone;
   timerDone=function(){
@@ -338,8 +337,7 @@ function startTimedCheck(idx,durSec,label){
   timerDur=durSec; timerLeft=durSec;
   timerEnd=Date.now()+durSec*1000;
   timerRunning=true;
-  ensureNotifPerm();
-  scheduleRestAlarm();
+  ensureNotifPerm().then(scheduleRestAlarm);
   const d=document.getElementById('timerDisp');
   const origDone=timerDone;
   timerDone=function(){
@@ -497,7 +495,7 @@ const DAYS = [
       {id:'B_row', name:'Barbell row',                    target:'4×6', hasW:true},
       {id:'B_pu',  name:'Pull-up',                        target:'3×6', hasW:false},
       {id:'B_dbr', name:'Single-arm DB row',              target:'3×10', hasW:true},
-      {id:'B_clh', name:'Cable low-to-high pull',         target:'3×12', hasW:true},
+      {id:'B_clh', name:'Cable rear delt fly (high pulleys)', target:'3×12', hasW:true},
       {id:'B_sat', name:'Reverse-grip cable pushdown',     target:'3×10', hasW:true},
       {id:'B_rgc', name:'Reverse-grip cable curl',         target:'3×10', hasW:true},
       {id:'B_zc',  name:'Cable bicep curl',               target:'3×10', hasW:true},
@@ -529,11 +527,10 @@ const DAYS = [
     ],
     exercises:[
       {id:'C_ht',  name:'Hip thrust (plate-loaded machine)', target:'3×10', hasW:true},
-      {id:'C_sc',  name:"Single-arm farmer's hold", target:'3×45sec', hasW:true, timerSec:45},
-      {id:'C_blw', name:'Banded lateral walk',        target:'3×15', hasW:false},
+      {id:'C_slr', name:'Single-arm cable lateral raise (low pulley)', target:'3×12/side', hasW:true},
       {id:'C_pp',  name:'Rotational Pallof press',    target:'3×12', hasW:false},
       {id:'C_cop', name:'Copenhagen plank',            target:'3×25sec', hasW:false, timerSec:25},
-      {id:'C_rkc', name:'RKC plank',                  target:'3×25sec', hasW:false, timerSec:25},
+      {id:'C_awr', name:'Ab wheel rollout',            target:'3×10', hasW:false},
       {id:'C_db',  name:'Dead bug',                   target:'3×10', hasW:false},
       {id:'C_gma', name:'Seated hip abduction machine', target:'3×15', hasW:true},
     ],
@@ -545,7 +542,7 @@ const DAYS = [
   },
   {
     id:'D', label:'Day D', title:'Lower — Posterior', color:'#fb923c', est:'55 min',
-    schedule: 'Fri',
+    schedule: 'Thu',
     warmup:[
       {t:'Single-leg glute bridge — 10/side',       v:yt('single leg glute bridge')},
       {t:'Myrtle routine — both sides',             v:yt('myrtle routine hip mobility'), notes:[
@@ -578,7 +575,7 @@ const DAYS = [
   },
   {
     id:'E', label:'Day E', title:'Upper — Push & Arms', color:'#e879f9', est:'55 min',
-    schedule: 'Sat',
+    schedule: 'Fri',
     warmup:[
       {t:'Loaded beast to plank — 3×8',             v:yt('loaded beast to plank transition')},
       {t:'Arm + hip circles — 10/side',             v:yt('arm circles hip circles warm up')},
@@ -602,52 +599,80 @@ const DAYS = [
       {id:'E_sat', name:'Single-arm overhead tricep extension', target:'3×10', hasW:true},
       {id:'E_lr',  name:'Cable lateral raise',        target:'4×15', hasW:true},
       {id:'E_hc',  name:'Cable hammer curl',          target:'3×12', hasW:true},
-      {id:'E_rpf', name:'Reverse pec fly machine',    target:'3×12', hasW:true},
       {id:'E_tem', name:'Cable tricep pushdown',      target:'3×10', hasW:true},
+      {id:'E_rpf', name:'Reverse pec fly machine',    target:'3×12', hasW:true},
     ],
     finisher:[
       {t:'Bilateral dead hang — 2×30 sec',                              v:yt('dead hang spinal decompression'), timerSec:30},
       {t:'Single-arm dead hang — 2×15 sec/side',                        v:yt('single arm dead hang shoulder stretch'), prog:'E_sdh', timerSec:'prog'},
-      {t:'Foam roller pec stretch with light DBs — 2×90 sec',           v:yt('foam roller chest opener dumbbell pec stretch')},
+      {t:'Foam roller pec stretch with light DBs — 2×90 sec',           v:yt('foam roller chest opener dumbbell pec stretch'), timerSec:90},
       {t:'Cobra stretch + neck rotations — 2×10',                       v:yt('cobra stretch neck rotation')},
       {t:'Wrist flexion/extension — 3×10',                              v:yt('wrist flexion extension stretch')},
     ]
   }
 ];
 
+// ── MACHINE WEIGHT STACKS (exact kg printed on the Gym n Go plates) ───────
+// Machines don't move in even steps, so instead of adding an increment and
+// hoping it lands on a real pin, we store the actual stack and step to the
+// next plate. Any weight shown for these exercises is a number you can
+// really select on the machine.
+const STACKS = {
+  // Functional trainer / cable stack — 10 lb plates
+  cable:  [4.5,9.1,13.6,18.1,22.7,27.2,31.8,36.3,40.8,45.4,49.9,54.4,59,63.5,68,72,77.1],
+  // Spirit selectorized machines — 15 lb plates
+  spirit: [6.81,13.6,20.5,27.3,34.1,40.9,47.7,54.7,61.4,68.2,75,81.8,88.6,95.5,102,109],
+  // Leg press — 20 lb plates
+  legpress:[15.9,24.9,34.9,43.1,52.2,61.2,70.4,79.4,88.5,97.6,115.7,124.7,133.8,142.9,152.1,161.2,170.3],
+};
+// Snap a weight to the nearest real plate on a stack.
+function snapStack(stackName,w){
+  const s=STACKS[stackName]; if(!s||!s.length) return w;
+  let best=s[0],bd=Math.abs(w-s[0]);
+  for(const v of s){const d=Math.abs(w-v);if(d<bd){bd=d;best=v;}}
+  return best;
+}
+// Step to the next plate up (or down) from the current weight.
+function stepStack(stackName,w,dir){
+  const s=STACKS[stackName]; if(!s||!s.length) return w;
+  const cur=snapStack(stackName,w);
+  const i=s.indexOf(cur);
+  const j=Math.min(s.length-1,Math.max(0,i+(dir>0?1:-1)));
+  return s[j];
+}
+
 // ── EX CONFIG ──────────────────────────────────────────────────────────────
 const EX_CONFIG = {
   A_sq:   {start:40,  inc:5,    rest:180, homeAlt:null, ramp:true},
   A_bss:  {start:10,  inc:2.5,  rest:90,  homeAlt:null},
-  A_lp:   {start:60,  inc:9,    rest:90,  homeAlt:'Extra set Bulgarian split squat (no leg press at home)', skip_home:true},
+  A_lp:   {start:61.2,inc:9,    stack:'legpress', rest:90,  homeAlt:'Extra set Bulgarian split squat (no leg press at home)', skip_home:true},
   A_lsu:  {start:10,  inc:2.5,  rest:90,  homeAlt:null},
   A_atg:  {start:0,   inc:2.5,  rest:90,  homeAlt:null},
   B_row:  {start:30,  inc:2.5,  rest:180, homeAlt:null},
   B_pu:   {start:0,   inc:0,    rest:120, repProg:true, homeAlt:'DB seal row — chest on bench, row DB each side', skip_home:true, note:'Bodyweight — hit 6 clean reps all 3 sets to add a rep next session'},
   B_dbr:  {start:12,  inc:2.5,  rest:90,  homeAlt:null},
-  B_clh:  {start:5,   inc:4.5,  rest:60,  homeAlt:'Resistance band low-to-high pull — 3×12', skip_home:false},
-  B_sat:  {start:9,   inc:4.5,  rest:60,  homeAlt:'Band tricep pushdown — anchor band high, no cable at home', skip_home:true},
-  B_zc:   {start:9,   inc:4.5,  rest:60,  homeAlt:'DB curl — no cable at home', skip_home:true},
-  B_rgc:  {start:9,   inc:4.5,  rest:60,  homeAlt:'Reverse-grip DB curl — no cable at home', skip_home:true},
+  B_clh:  {start:4.5, inc:4.5,  stack:'cable', rest:60,  homeAlt:'Resistance band pull-apart, arms high — 3×12', skip_home:false},
+  B_sat:  {start:9.1, inc:4.5,  stack:'cable', rest:60,  homeAlt:'Band tricep pushdown — anchor band high, no cable at home', skip_home:true},
+  B_zc:   {start:9.1, inc:4.5,  stack:'cable', rest:60,  homeAlt:'DB curl — no cable at home', skip_home:true},
+  B_rgc:  {start:9.1, inc:4.5,  stack:'cable', rest:60,  homeAlt:'Reverse-grip DB curl — no cable at home', skip_home:true},
   C_ht:   {start:20,  inc:5,    rest:120, homeAlt:'Glute bridge — bodyweight or barbell if available, no hip thrust machine at home', skip_home:true},
-  C_blw:  {start:0,   inc:0,    rest:60,  homeAlt:null},
   C_cop:  {start:0,   inc:0,    rest:60,  homeAlt:null, stageProg:'C_cop'},
-  C_gma:  {start:18,  inc:6.8,  rest:60,  homeAlt:'Side-lying hip abduction — 3×15/side (bodyweight)', skip_home:true},
+  C_gma:  {start:20.5,inc:6.8,  stack:'spirit', rest:60,  homeAlt:'Side-lying hip abduction — 3×15/side (bodyweight)', skip_home:true},
   C_db:   {start:0,   inc:0,    rest:60,  homeAlt:null},
   C_pp:   {start:0,   inc:0,    rest:60,  homeAlt:'Anchor band to squat rack upright for Pallof press'},
-  C_sc:   {start:16,  inc:2.5,  rest:60,  homeAlt:null},
-  C_rkc:  {start:0,   inc:0,    rest:60,  homeAlt:null},
+  C_slr:  {start:4.5, inc:4.5,  stack:'cable', rest:60,  homeAlt:'Single-arm lateral raise — dumbbell or resistance band', skip_home:false},
+  C_awr:  {start:0,   inc:0,    rest:60,  homeAlt:'Ab wheel rollout — same if you have one at home, otherwise plank walkouts'},
   D_td:   {start:50,  inc:5,    rest:180, homeAlt:null, ramp:true},
   D_rdl:  {start:30,  inc:5,    rest:90,  homeAlt:null},
   D_slrdl:{start:10,  inc:2.5,  rest:90,  homeAlt:null},
-  D_lc:   {start:23,  inc:6.8,  rest:60,  homeAlt:'DB Romanian deadlift — no leg curl machine at home', skip_home:true},
-  D_cp:   {start:40,  inc:9,    rest:60,  homeAlt:'Standing calf raise — bodyweight or holding DBs', skip_home:true, note:'Done on the leg press — feet low on the platform, press through the balls of your feet. Weight is a guess; use ✎ edit on the Stats screen to correct it after your first session.'},
+  D_lc:   {start:20.5,inc:6.8,  stack:'spirit', rest:60,  homeAlt:'DB Romanian deadlift — no leg curl machine at home', skip_home:true},
+  D_cp:   {start:43.1,inc:9,    stack:'legpress', rest:60,  homeAlt:'Standing calf raise — bodyweight or holding DBs', skip_home:true, note:'Done on the leg press — feet low on the platform, press through the balls of your feet. Adjust the weight to suit if the leg-press number feels off for calves.'},
   E_sdp:  {start:20,  inc:2.5,  rest:120, homeAlt:'Standing DB overhead press — no barbell at home', skip_home:true},
-  E_rpf:  {start:18,  inc:6.8,  rest:60,  homeAlt:'DB rear delt fly — bent over, 3×12', skip_home:true},
-  E_lr:   {start:5,   inc:4.5,  rest:60,  homeAlt:'DB lateral raise — no cable at home', skip_home:true},
-  E_hc:   {start:5,   inc:4.5,  rest:60,  homeAlt:'DB hammer curl — no cable at home', skip_home:true},
+  E_rpf:  {start:20.5,inc:6.8,  stack:'spirit', rest:60,  homeAlt:'DB rear delt fly — bent over, 3×12', skip_home:true},
+  E_lr:   {start:4.5, inc:4.5,  stack:'cable', rest:60,  homeAlt:'DB lateral raise — no cable at home', skip_home:true},
+  E_hc:   {start:4.5, inc:4.5,  stack:'cable', rest:60,  homeAlt:'DB hammer curl — no cable at home', skip_home:true},
   E_sat:  {start:8,   inc:2.5,  rest:60,  homeAlt:null},
-  E_tem:  {start:5,   inc:4.5,  rest:60,  homeAlt:'Single-arm DB overhead triceps extension (already in session) — no cable at home', skip_home:true},
+  E_tem:  {start:4.5, inc:4.5,  stack:'cable', rest:60,  homeAlt:'Single-arm DB overhead triceps extension (already in session) — no cable at home', skip_home:true},
   E_sdh:  {start:0,   inc:0,    rest:60,  timeProg:true, startSec:15, incSec:5, maxSec:30},
 };
 
@@ -660,18 +685,17 @@ const EX_VIDEO = {
   B_row:  ytS('barbell row form'),
   B_pu:   ytS('pull up dead hang form'),
   B_dbr:  ytS('single arm dumbbell row'),
-  B_clh:  ytS('cable low to high pull rear delt'),
+  B_clh:  ytS('cable rear delt fly high pulley'),
   B_sat:  ytS('reverse grip cable pushdown triceps'),
   B_zc:   ytS('standing cable bicep curl form'),
   B_rgc:  ytS('reverse grip cable curl forearm'),
   C_ht:   ytS('plate loaded hip thrust machine form'),
-  C_blw:  ytS('banded lateral walk glute med'),
   C_cop:  ytS('copenhagen plank'),
   C_gma:  ytS('seated hip abduction machine glute med'),
   C_db:   yt('dead bug core exercise'),
   C_pp:   ytS('rotational pallof press anti rotation'),
-  C_sc:   ytS('single arm farmers hold exercise'),
-  C_rkc:  ytS('RKC plank posterior tilt'),
+  C_slr:  ytS('single arm cable lateral raise low pulley'),
+  C_awr:  ytS('ab wheel rollout form'),
   D_td:   ytS('conventional deadlift form'),
   D_rdl:  ytS('romanian deadlift form'),
   D_slrdl:ytS('single leg rdl dumbbell'),
@@ -698,7 +722,7 @@ let editCtx=null;
 // ── HELPERS ────────────────────────────────────────────────────────────────
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const num=v=>{const n=parseFloat(v);return isFinite(n)?n:0;};
-const round25=v=>Math.round(v*4)/4;
+const round25=v=>Math.round(v*10)/10;
 const todayStr=()=>new Date().toISOString().slice(0,10);
 
 // ── STORAGE ────────────────────────────────────────────────────────────────
@@ -855,9 +879,13 @@ function applyProgression(exId,sets){
     const successWeights=logged.filter(s=>num(s.reps)>=hi).map(s=>num(s.weight));
     const topSet=successWeights.length?Math.max.apply(null,successWeights):p.w;
     const base=Math.max(topSet,0)||p.w;
-    p.w=round25(base+cfg.inc);
+    // Machines: step to the next real plate. Free weights: add the increment.
+    p.w=cfg.stack?stepStack(cfg.stack,base,1):round25(base+cfg.inc);
   }
-  else if(missed){p.fail++;if(p.fail>=2){p.w=Math.max(cfg.start||0,round25(p.w*0.9));p.fail=0;}}
+  else if(missed){p.fail++;if(p.fail>=2){
+    p.w=cfg.stack?Math.max(cfg.start||0,stepStack(cfg.stack,p.w,-1))
+                 :Math.max(cfg.start||0,round25(p.w*0.9));
+    p.fail=0;}}
 }
 
 // Live preview — never mutates state.
@@ -884,7 +912,8 @@ function getNote(exId,sets){
   if(allTop){
     const successWeights=logged.filter(s=>num(s.reps)>=hi).map(s=>num(s.weight));
     const topSet=successWeights.length?Math.max.apply(null,successWeights):p.w;
-    const nextW=round25((Math.max(topSet,0)||p.w)+cfg.inc);
+    const base=Math.max(topSet,0)||p.w;
+    const nextW=cfg.stack?stepStack(cfg.stack,base,1):round25(base+cfg.inc);
     return {type:'bump',msg:'All sets hit — '+nextW+' kg next session'};
   }
   if(missed&&p.fail>=1) return {type:'drop',msg:'Missed reps again — weight drops ~10% next session'};
@@ -1134,7 +1163,7 @@ function renderWorkout(){
     const prHit=sets.some(s=>s.logged&&s.weight&&s.reps&&isPR(ex.id,num(s.weight),num(s.reps)));
     const sw=ex.hasW?getSuggestedW(ex.id):null;
     const note=getNote(ex.id,sets);
-    const nextW=ex.hasW&&cfg.inc?round25((sw||0)+cfg.inc):null;
+    const nextW=ex.hasW&&cfg.inc?(cfg.stack?stepStack(cfg.stack,sw||0,1):round25((sw||0)+cfg.inc)):null;
     const allDone=sets.length>0&&sets.every(s=>s.logged);
 
     h+='<div class="ex-card'+(isSkipped?' skipped':'')+'">'+
@@ -1432,9 +1461,15 @@ function stepInc(){
 }
 function stepVal(dir){
   const inp=document.getElementById('stepVal');
-  let v=num(inp.value)+dir*stepInc();
-  v=Math.max(0,round25(v));
-  inp.value=v;
+  const cfg=editCtx?(EX_CONFIG[editCtx.exId]||{}):{};
+  let v;
+  if(editCtx&&editCtx.field==='weight'&&cfg.stack){
+    // Machine: jump straight to the next real plate on the stack.
+    v=stepStack(cfg.stack,num(inp.value),dir);
+  }else{
+    v=round25(num(inp.value)+dir*stepInc());
+  }
+  inp.value=Math.max(0,v);
   commitEdit();
 }
 function commitEdit(){
@@ -1504,8 +1539,7 @@ function startRest(dur){
   timerEnd=Date.now()+dur*1000;
   timerLeft=dur;
   timerRunning=true;
-  ensureNotifPerm();
-  scheduleRestAlarm();
+  ensureNotifPerm().then(scheduleRestAlarm);
   runTicker();
   updateTimerUI();
 }
@@ -1519,8 +1553,7 @@ function toggleTimer(){
     if(timerLeft<=0) timerLeft=timerDur;
     timerEnd=Date.now()+timerLeft*1000;
     timerRunning=true;
-    ensureNotifPerm();
-    scheduleRestAlarm();
+    ensureNotifPerm().then(scheduleRestAlarm);
     runTicker();
   }
   updateTimerUI();
@@ -1608,13 +1641,18 @@ document.addEventListener('visibilitychange',()=>{
 // (the alarm is scheduled 1.5 s late to give the page first go).
 let notifAsked=false;
 function ensureNotifPerm(){
+  // Returns a promise so callers can wait for the (async) permission prompt
+  // to actually resolve before trying to schedule an alarm — scheduling
+  // immediately after firing the prompt would always see 'default' and
+  // silently skip the very first alarm, even if the user then taps Allow.
   try{
-    if(!('Notification' in window)||!('serviceWorker' in navigator)) return;
+    if(!('Notification' in window)||!('serviceWorker' in navigator)) return Promise.resolve();
     if(Notification.permission==='default'&&!notifAsked){
       notifAsked=true;
-      Notification.requestPermission().catch(()=>{});
+      return Notification.requestPermission().catch(()=>{});
     }
   }catch(e){}
+  return Promise.resolve();
 }
 function swMsg(msg){
   try{
@@ -1757,7 +1795,8 @@ function editNextW(exId){
   if(val===null) return;
   const v=num(val);
   if(v<0||v>500){alert("That doesn't look right — not saved.");return;}
-  p.w=round25(v);
+  const cfgE=EX_CONFIG[exId]||{};
+  p.w=cfgE.stack?snapStack(cfgE.stack,v):round25(v);
   p.fail=0;
   saveAll(); renderStats();
 }
