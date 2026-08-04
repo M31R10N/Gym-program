@@ -38,17 +38,19 @@ a{color:inherit;text-decoration:none}
 .bw-inp{width:72px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 10px;text-align:center;font-size:16px}
 .bw-unit{font-size:13px;color:var(--text3)}
 .day-list{padding:0 14px;display:flex;flex-direction:column;gap:8px}
-.day-btn{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:14px;display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:left;width:100%}
+.day-btn{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:14px;display:flex;align-items:center;justify-content:space-between;gap:10px;text-align:left;width:100%;position:relative}
+.day-btn-next{border-width:1.5px}
 .day-btn-left{display:flex;align-items:center;gap:12px;min-width:0}
 .day-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
 .day-name{font-size:16px;font-weight:700}
 .day-sub-text{font-size:12px;color:var(--text2);margin-top:2px}
+.next-badge{position:absolute;top:-7px;left:14px;font-size:9px;font-weight:700;letter-spacing:.06em;padding:2px 7px;border-radius:5px;background:var(--bg);text-transform:uppercase}
+.next-up-inner{display:flex;align-items:center;gap:10px}
+.next-up-sub{font-size:11px;color:var(--text3);margin-top:1px}
 .ring-wrap{position:relative;flex-shrink:0}
 .ring-lbl{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700}
 .schedule-card{margin:0 14px 12px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:11px 14px}
 .schedule-title{font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px}
-.schedule-row{display:flex;gap:5px}
-.schedule-day{flex:1;text-align:center;font-size:10px;padding:6px 1px;border-radius:6px;border:1px solid var(--border)}
 .tools-row{padding:18px 14px 26px;display:flex;gap:8px;justify-content:center}
 .tool-btn{font-size:12px;color:var(--text2);border:1px solid var(--border);border-radius:20px;padding:8px 14px;background:var(--bg2)}
 .tool-btn.danger{color:#f43f5e;border-color:rgba(244,63,94,.3)}
@@ -187,7 +189,7 @@ a{color:inherit;text-decoration:none}
     <div style="display:flex;align-items:center;justify-content:space-between">
       <div>
         <div class="home-title">My Program</div>
-        <div class="home-sub">5-day hypertrophy + mobility · ~60 min</div>
+        <div class="home-sub">Rotation-based · ~60 min</div>
       </div>
       <button class="pack-tab-btn" onclick="showScreen('screenPack')" id="packBadge">🎒</button>
     </div>
@@ -198,8 +200,8 @@ a{color:inherit;text-decoration:none}
     <div class="bw-unit">kg</div>
   </div>
   <div class="schedule-card">
-    <div class="schedule-title">Suggested weekly schedule</div>
-    <div class="schedule-row" id="scheduleRow"></div>
+    <div class="schedule-title">Next up</div>
+    <div id="nextUpRow"></div>
   </div>
   <div id="dayList" class="day-list"></div>
   <div id="backupNudge" style="text-align:center;font-size:12px;color:var(--text3);padding:14px 14px 0;min-height:14px"></div>
@@ -436,8 +438,7 @@ function packDone(){
 
 const DAYS = [
   {
-    id:'A', label:'Day A', title:'Lower — Quad', color:'#a3e635', est:'55 min',
-    schedule: 'Mon',
+    id:'A', label:'Day A', title:'Lower — Quad + Core', color:'#a3e635', est:'65 min',
     warmup:[
       {t:'ATG ankle pulses — 1 min/side',            v:yt('ATG ankle pulses mobility')},
       {t:'Deep squat 3-sec hold — 10 reps',          v:yt('deep squat hold mobility')},
@@ -462,6 +463,8 @@ const DAYS = [
       {id:'A_lsu', name:'Lateral squat',         target:'3×10', hasW:true},
       {id:'A_atg', name:'ATG split squat',        target:'2×8', hasW:true},
       {id:'A_lp',  name:'Leg press',             target:'3×12', hasW:true},
+      {id:'A_awr', name:'Ab wheel rollout',      target:'3×10', hasW:false},
+      {id:'A_db',  name:'Dead bug',              target:'3×10', hasW:false},
     ],
     finisher:[
       {t:'Cossack squat — 2×8/side',              v:yt('cossack squat mobility')},
@@ -470,8 +473,7 @@ const DAYS = [
     ]
   },
   {
-    id:'B', label:'Day B', title:'Upper — Pull', color:'#38bdf8', est:'55 min',
-    schedule: 'Tue',
+    id:'B', label:'Day B', title:'Upper — Pull', color:'#38bdf8', est:'50 min',
     warmup:[
       {t:'Band pull-aparts — 20 reps',             v:yt('band pull apart rear delt')},
       {t:'Scapular wall slides — 10 reps',          v:yt('scapular wall slide posture')},
@@ -496,7 +498,6 @@ const DAYS = [
       {id:'B_pu',  name:'Pull-up',                        target:'3×6', hasW:false},
       {id:'B_dbr', name:'Single-arm DB row',              target:'3×10', hasW:true},
       {id:'B_clh', name:'Cable rear delt fly (high pulleys)', target:'3×12', hasW:true},
-      {id:'B_sat', name:'Reverse-grip cable pushdown',     target:'3×10', hasW:true},
       {id:'B_rgc', name:'Reverse-grip cable curl',         target:'3×10', hasW:true},
       {id:'B_zc',  name:'Cable bicep curl',               target:'3×10', hasW:true},
     ],
@@ -507,42 +508,7 @@ const DAYS = [
     ]
   },
   {
-    id:'C', label:'Day C', title:'Glute Med + Core', color:'#f97316', est:'50 min',
-    schedule: 'Wed',
-    warmup:[
-      {t:'Single-leg glute bridge — 10/side',       v:yt('single leg glute bridge')},
-      {t:'Myrtle routine — both sides',             v:yt('myrtle routine hip mobility'), notes:[
-        '1. Clams — 8/side',
-        '2. Lateral leg raise — 8 neutral · 8 hips up · 8 hips down',
-        '3. Donkey kicks — 8/side',
-        '4. Donkey whips — 8/side',
-        '5. Fire hydrants — 8/side',
-        '6. Knee circle forward — 8/side',
-        '7. Knee circle backward — 8/side',
-        '8. Hurdle trail leg forward — 5/side',
-        '9. Hurdle trail leg backward — 5/side',
-        '10. Lateral leg swings — 10/side',
-        '11. Front/back leg swings — 10/side',
-      ]},
-    ],
-    exercises:[
-      {id:'C_ht',  name:'Hip thrust (plate-loaded machine)', target:'3×10', hasW:true},
-      {id:'C_slr', name:'Single-arm cable lateral raise (low pulley)', target:'3×12/side', hasW:true},
-      {id:'C_pp',  name:'Rotational Pallof press',    target:'3×12', hasW:false},
-      {id:'C_cop', name:'Copenhagen plank',            target:'3×25sec', hasW:false, timerSec:25},
-      {id:'C_awr', name:'Ab wheel rollout',            target:'3×10', hasW:false},
-      {id:'C_db',  name:'Dead bug',                   target:'3×10', hasW:false},
-      {id:'C_gma', name:'Seated hip abduction machine', target:'3×15', hasW:true},
-    ],
-    finisher:[
-      {t:'Elephant walk — 3 sets',                  v:yt('elephant walk hamstring stretch')},
-      {t:'Pancake stretch — 2×30 sec',              v:yt('pancake stretch flexibility')},
-      {t:'Hip flexor stretch — 2×45 sec/side',      v:yt('couch stretch hip flexor')},
-    ]
-  },
-  {
-    id:'D', label:'Day D', title:'Lower — Posterior', color:'#fb923c', est:'55 min',
-    schedule: 'Thu',
+    id:'D', label:'Day D', title:'Lower — Posterior + Glute Med', color:'#fb923c', est:'70 min',
     warmup:[
       {t:'Single-leg glute bridge — 10/side',       v:yt('single leg glute bridge')},
       {t:'Myrtle routine — both sides',             v:yt('myrtle routine hip mobility'), notes:[
@@ -562,20 +528,24 @@ const DAYS = [
     ],
     exercises:[
       {id:'D_td',    name:'Conventional deadlift', target:'4×6', hasW:true},
-      {id:'D_rdl',   name:'Romanian deadlift', target:'3×10', hasW:true},
       {id:'D_slrdl', name:'Single-leg RDL',    target:'3×10', hasW:true},
+      {id:'D_rdl',   name:'Romanian deadlift', target:'3×10', hasW:true},
       {id:'D_lc',    name:'Prone leg curl',    target:'3×12', hasW:true},
       {id:'D_cp',    name:'Calf press (on leg press)', target:'3×15', hasW:true},
+      {id:'D_ht',    name:'Hip thrust (plate-loaded machine)', target:'3×10', hasW:true},
+      {id:'D_gma',   name:'Seated hip abduction machine', target:'3×15', hasW:true},
+      {id:'D_spd',   name:'Side plank with hip dip', target:'3×25sec', hasW:false, timerSec:25},
+      {id:'D_pp',    name:'Rotational Pallof press', target:'3×12', hasW:false},
     ],
     finisher:[
       {t:'Seated pancake stretch — 2×30 sec',       v:yt('seated pancake stretch flexibility')},
       {t:'Hip flexor stretch + posterior tilt — 2×45 sec/side', v:yt('hip flexor stretch posterior tilt')},
       {t:'Pigeon push-up — 2×6/side',              v:yt('pigeon push up stretch')},
+      {t:'Elephant walk — 3 sets',                  v:yt('elephant walk hamstring stretch')},
     ]
   },
   {
-    id:'E', label:'Day E', title:'Upper — Push & Arms', color:'#e879f9', est:'55 min',
-    schedule: 'Fri',
+    id:'E', label:'Day E', title:'Upper — Push & Arms', color:'#e879f9', est:'60 min',
     warmup:[
       {t:'Loaded beast to plank — 3×8',             v:yt('loaded beast to plank transition')},
       {t:'Arm + hip circles — 10/side',             v:yt('arm circles hip circles warm up')},
@@ -596,10 +566,11 @@ const DAYS = [
     ],
     exercises:[
       {id:'E_sdp', name:'Standing barbell overhead press', target:'4×8', hasW:true},
+      {id:'E_cpm', name:'Chest press machine',      target:'3×10', hasW:true},
       {id:'E_sat', name:'Single-arm overhead tricep extension', target:'3×10', hasW:true},
       {id:'E_lr',  name:'Cable lateral raise',        target:'4×15', hasW:true},
       {id:'E_hc',  name:'Cable hammer curl',          target:'3×12', hasW:true},
-      {id:'E_tem', name:'Cable tricep pushdown',      target:'3×10', hasW:true},
+      {id:'E_rgp', name:'Reverse-grip cable pushdown', target:'3×10', hasW:true},
       {id:'E_rpf', name:'Reverse pec fly machine',    target:'3×12', hasW:true},
     ],
     finisher:[
@@ -648,31 +619,30 @@ const EX_CONFIG = {
   A_lp:   {start:61.2,inc:9,    stack:'legpress', rest:90,  homeAlt:'Extra set Bulgarian split squat (no leg press at home)', skip_home:true},
   A_lsu:  {start:10,  inc:2.5,  rest:90,  homeAlt:null},
   A_atg:  {start:0,   inc:2.5,  rest:90,  homeAlt:null},
+  A_awr:  {start:0,   inc:0,    rest:60,  homeAlt:'Ab wheel rollout — same if you have one at home, otherwise plank walkouts'},
+  A_db:   {start:0,   inc:0,    rest:60,  homeAlt:null},
   B_row:  {start:30,  inc:2.5,  rest:180, homeAlt:null},
   B_pu:   {start:0,   inc:0,    rest:120, repProg:true, homeAlt:'DB seal row — chest on bench, row DB each side', skip_home:true, note:'Bodyweight — hit 6 clean reps all 3 sets to add a rep next session'},
   B_dbr:  {start:12,  inc:2.5,  rest:90,  homeAlt:null},
   B_clh:  {start:4.5, inc:4.5,  stack:'cable', rest:60,  homeAlt:'Resistance band pull-apart, arms high — 3×12', skip_home:false},
-  B_sat:  {start:9.1, inc:4.5,  stack:'cable', rest:60,  homeAlt:'Band tricep pushdown — anchor band high, no cable at home', skip_home:true},
   B_zc:   {start:9.1, inc:4.5,  stack:'cable', rest:60,  homeAlt:'DB curl — no cable at home', skip_home:true},
   B_rgc:  {start:9.1, inc:4.5,  stack:'cable', rest:60,  homeAlt:'Reverse-grip DB curl — no cable at home', skip_home:true},
-  C_ht:   {start:20,  inc:5,    rest:120, homeAlt:'Glute bridge — bodyweight or barbell if available, no hip thrust machine at home', skip_home:true},
-  C_cop:  {start:0,   inc:0,    rest:60,  homeAlt:null, stageProg:'C_cop'},
-  C_gma:  {start:20.5,inc:6.8,  stack:'spirit', rest:60,  homeAlt:'Side-lying hip abduction — 3×15/side (bodyweight)', skip_home:true},
-  C_db:   {start:0,   inc:0,    rest:60,  homeAlt:null},
-  C_pp:   {start:0,   inc:0,    rest:60,  homeAlt:'Anchor band to squat rack upright for Pallof press'},
-  C_slr:  {start:4.5, inc:4.5,  stack:'cable', rest:60,  homeAlt:'Single-arm lateral raise — dumbbell or resistance band', skip_home:false},
-  C_awr:  {start:0,   inc:0,    rest:60,  homeAlt:'Ab wheel rollout — same if you have one at home, otherwise plank walkouts'},
   D_td:   {start:50,  inc:5,    rest:180, homeAlt:null, ramp:true},
-  D_rdl:  {start:30,  inc:5,    rest:90,  homeAlt:null},
   D_slrdl:{start:10,  inc:2.5,  rest:90,  homeAlt:null},
+  D_rdl:  {start:30,  inc:5,    rest:90,  homeAlt:null},
   D_lc:   {start:20.5,inc:6.8,  stack:'spirit', rest:60,  homeAlt:'DB Romanian deadlift — no leg curl machine at home', skip_home:true},
   D_cp:   {start:43.1,inc:9,    stack:'legpress', rest:60,  homeAlt:'Standing calf raise — bodyweight or holding DBs', skip_home:true, note:'Done on the leg press — feet low on the platform, press through the balls of your feet. Adjust the weight to suit if the leg-press number feels off for calves.'},
+  D_ht:   {start:20,  inc:5,    rest:120, homeAlt:'Glute bridge — bodyweight or barbell if available, no hip thrust machine at home', skip_home:true},
+  D_gma:  {start:20.5,inc:6.8,  stack:'spirit', rest:60,  homeAlt:'Side-lying hip abduction — 3×15/side (bodyweight)', skip_home:true},
+  D_spd:  {start:0,   inc:0,    rest:60,  homeAlt:'Side plank with hip dip — same, bodyweight'},
+  D_pp:   {start:0,   inc:0,    rest:60,  homeAlt:'Anchor band to squat rack upright for Pallof press'},
   E_sdp:  {start:20,  inc:2.5,  rest:120, homeAlt:'Standing DB overhead press — no barbell at home', skip_home:true},
+  E_cpm:  {start:20.5,inc:6.8,  stack:'spirit', rest:90,  homeAlt:'Push-up — no chest press machine at home', skip_home:true},
   E_rpf:  {start:20.5,inc:6.8,  stack:'spirit', rest:60,  homeAlt:'DB rear delt fly — bent over, 3×12', skip_home:true},
   E_lr:   {start:4.5, inc:4.5,  stack:'cable', rest:60,  homeAlt:'DB lateral raise — no cable at home', skip_home:true},
   E_hc:   {start:4.5, inc:4.5,  stack:'cable', rest:60,  homeAlt:'DB hammer curl — no cable at home', skip_home:true},
   E_sat:  {start:8,   inc:2.5,  rest:60,  homeAlt:null},
-  E_tem:  {start:4.5, inc:4.5,  stack:'cable', rest:60,  homeAlt:'Single-arm DB overhead triceps extension (already in session) — no cable at home', skip_home:true},
+  E_rgp:  {start:9.1, inc:4.5,  stack:'cable', rest:60,  homeAlt:'Band tricep pushdown — anchor band high, no cable at home', skip_home:true},
   E_sdh:  {start:0,   inc:0,    rest:60,  timeProg:true, startSec:15, incSec:5, maxSec:30},
 };
 
@@ -682,35 +652,31 @@ const EX_VIDEO = {
   A_lp:   ytS('leg press how to'),
   A_lsu:  ytS('lateral squat exercise'),
   A_atg:  yt('ATG ankle pulses mobility'),
+  A_awr:  ytS('ab wheel rollout form'),
+  A_db:   yt('dead bug core exercise'),
   B_row:  ytS('barbell row form'),
   B_pu:   ytS('pull up dead hang form'),
   B_dbr:  ytS('single arm dumbbell row'),
   B_clh:  ytS('cable rear delt fly high pulley'),
-  B_sat:  ytS('reverse grip cable pushdown triceps'),
   B_zc:   ytS('standing cable bicep curl form'),
   B_rgc:  ytS('reverse grip cable curl forearm'),
-  C_ht:   ytS('plate loaded hip thrust machine form'),
-  C_cop:  ytS('copenhagen plank'),
-  C_gma:  ytS('seated hip abduction machine glute med'),
-  C_db:   yt('dead bug core exercise'),
-  C_pp:   ytS('rotational pallof press anti rotation'),
-  C_slr:  ytS('single arm cable lateral raise low pulley'),
-  C_awr:  ytS('ab wheel rollout form'),
   D_td:   ytS('conventional deadlift form'),
-  D_rdl:  ytS('romanian deadlift form'),
   D_slrdl:ytS('single leg rdl dumbbell'),
+  D_rdl:  ytS('romanian deadlift form'),
   D_lc:   ytS('prone leg curl machine'),
   D_cp:   ytS('calf raise on leg press machine'),
+  D_ht:   ytS('plate loaded hip thrust machine form'),
+  D_gma:  ytS('seated hip abduction machine glute med'),
+  D_spd:  ytS('side plank hip dip exercise'),
+  D_pp:   ytS('rotational pallof press anti rotation'),
   E_sdp:  ytS('standing barbell overhead press form'),
+  E_cpm:  ytS('chest press machine form'),
   E_rpf:  ytS('reverse pec fly machine rear delt'),
   E_lr:   ytS('cable lateral raise form'),
   E_hc:   ytS('cable hammer curl rope form'),
   E_sat:  ytS('single arm overhead triceps extension dumbbell'),
-  E_tem:  ytS('cable tricep pushdown form'),
+  E_rgp:  ytS('reverse grip cable pushdown triceps'),
 };
-
-const SCHEDULE = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
-const SCHEDULE_DAYS = {Mon:'A',Tue:'B',Wed:'C',Thu:'D',Fri:'E',Sat:null,Sun:null};
 
 // ── STATE ──────────────────────────────────────────────────────────────────
 let currentDay=null, homeGym=false, keepAwake=true;
@@ -794,13 +760,7 @@ function resetData(){
 // Stage is stored in progression[exId].stage (0-indexed).
 
 const STAGE_PROGS = {
-  C_cop: [
-    {label:'Stage 1 — Knee on bench, 10 sec', sets:3, reps:null, timerSec:10, inst:'Short lever — position yourself so your top knee rests on the bench (not your foot). Hold a solid side plank. Head, shoulders, hips aligned. No sagging.'},
-    {label:'Stage 2 — Knee on bench, 20 sec', sets:3, reps:null, timerSec:20, inst:'Same knee-on-bench position. Build the hold to 20 seconds. Stop the set if hips sag — quality over time.'},
-    {label:'Stage 3 — Foot on bench, 10 sec', sets:3, reps:null, timerSec:10, inst:'Long lever — shift out until your lower leg or foot is the contact point on the bench. Much harder. Back to 10 seconds while you adapt.'},
-    {label:'Stage 4 — Foot on bench, 20 sec', sets:3, reps:null, timerSec:20, inst:'Foot on bench, hold for 20 seconds. This is the standard Copenhagen plank. Keep hips level throughout.'},
-    {label:'Stage 5 — Dynamic hip dips',      sets:3, reps:10,  timerSec:null, inst:'From foot-on-bench position, lower your hips toward the floor in a controlled manner, then raise back to neutral. One dip and return = one rep. Keep the movement slow.'},
-  ],
+  // No exercises currently use a stage progression — this stays empty until one does.
 };
 
 // Get current stage object for an exercise
@@ -850,6 +810,14 @@ function getP(exId){
   return progression[exId];
 }
 function getSuggestedW(exId){return getP(exId).w;}
+
+// ── ROTATION (no fixed weekdays — just "what's next after last completed") ──
+function getNextDayId(){
+  const ids=DAYS.map(d=>d.id);
+  const last=loadL('lastCompletedDay');
+  const idx=ids.indexOf(last);
+  return ids[(idx+1)%ids.length]; // idx===-1 (never completed) → ids[0]
+}
 function findEx(exId){for(const d of DAYS){const e=d.exercises.find(x=>x.id===exId);if(e)return e;}return null;}
 
 // Applied ONCE per session, when the workout is saved (or auto-archived next day).
@@ -1040,22 +1008,28 @@ function isPR(exId,w,r){
 
 // ── RENDER HOME ────────────────────────────────────────────────────────────
 function renderHome(){
-  const sr=document.getElementById('scheduleRow');
-  sr.innerHTML=SCHEDULE.map(day=>{
-    const dId=SCHEDULE_DAYS[day];
-    const d=dId?DAYS.find(x=>x.id===dId):null;
-    const col=d?d.color:'var(--text3)';
-    return '<div class="schedule-day" style="'+(d?'border-color:'+col+';color:'+col:'color:var(--text3)')+'">'+
-      '<div style="font-size:9px;font-weight:700">'+day+'</div>'+
-      '<div style="font-size:10px;margin-top:2px">'+(d?d.id:'—')+'</div>'+
+  const nextId=getNextDayId();
+  const nextDay=DAYS.find(d=>d.id===nextId);
+  const nu=document.getElementById('nextUpRow');
+  if(nu&&nextDay){
+    const lastId=loadL('lastCompletedDay');
+    const lastDay=lastId?DAYS.find(d=>d.id===lastId):null;
+    nu.innerHTML='<div class="next-up-inner">'+
+      '<div class="day-dot" style="background:'+nextDay.color+'"></div>'+
+      '<div>'+
+        '<div style="font-size:15px;font-weight:700">'+nextDay.label+' — '+nextDay.title+'</div>'+
+        '<div class="next-up-sub">'+(lastDay?'Last completed: '+lastDay.label:'Pick any day to start your rotation')+'</div>'+
+      '</div>'+
     '</div>';
-  }).join('');
+  }
 
   const list=document.getElementById('dayList');
   list.innerHTML=DAYS.map(d=>{
     const pct=dayPct(d.id);
+    const isNext=d.id===nextId;
     const R=20,circ=2*Math.PI*R,dash=(pct/100)*circ;
-    return '<button class="day-btn" onclick="openDay(\''+d.id+'\')">'+
+    return '<button class="day-btn'+(isNext?' day-btn-next':'')+'" style="'+(isNext?'border-color:'+d.color:'')+'" onclick="openDay(\''+d.id+'\')">'+
+      (isNext?'<div class="next-badge" style="color:'+d.color+';border:1px solid '+d.color+'">Next</div>':'')+
       '<div class="day-btn-left">'+
         '<div class="day-dot" style="background:'+d.color+'"></div>'+
         '<div>'+
@@ -1430,6 +1404,7 @@ function saveWorkout(){
     if(item.prog&&c[idx]) applyTimeProg(item.prog);
   });
   saveL('last_'+currentDay,todayStr());
+  if(dayPct(currentDay)===100) saveL('lastCompletedDay',currentDay);
   saveAll(); renderWorkout();
   const el=document.getElementById('saveConfirm');
   if(el) el.textContent=count>0?'✓ Saved — '+count+' sets logged to history':'✓ Saved — nothing new to log';
