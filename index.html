@@ -438,7 +438,7 @@ function packDone(){
 
 const DAYS = [
   {
-    id:'A', label:'Day A', title:'Lower — Quad + Core', color:'#a3e635', est:'65 min',
+    id:'A', label:'Day A', title:'Lower — Quad + Glute Med', color:'#a3e635', est:'60 min',
     warmup:[
       {t:'ATG ankle pulses — 1 min/side',            v:yt('ATG ankle pulses mobility')},
       {t:'Deep squat 3-sec hold — 10 reps',          v:yt('deep squat hold mobility')},
@@ -461,8 +461,8 @@ const DAYS = [
       {id:'A_sq',  name:'Barbell back squat',   target:'4×8', hasW:true},
       {id:'A_bss', name:'Bulgarian split squat', target:'3×10', hasW:true},
       {id:'A_lsu', name:'Cossack squat (weighted)', target:'3×10', hasW:true},
-      {id:'A_atg', name:'ATG split squat',        target:'2×8', hasW:true},
       {id:'A_lp',  name:'Leg press',             target:'3×12', hasW:true},
+      {id:'A_gma', name:'Seated hip abduction machine', target:'3×15', hasW:true},
       {id:'A_awr', name:'Ab wheel rollout',      target:'3×10', hasW:false},
       {id:'A_db',  name:'Dead bug',              target:'3×10', hasW:false},
     ],
@@ -507,7 +507,7 @@ const DAYS = [
     ]
   },
   {
-    id:'D', label:'Day D', title:'Lower — Posterior + Glute Med', color:'#fb923c', est:'70 min',
+    id:'D', label:'Day D', title:'Lower — Posterior', color:'#fb923c', est:'65 min',
     warmup:[
       {t:'Single-leg glute bridge — 10/side',       v:yt('single leg glute bridge')},
       {t:'Myrtle routine — both sides',             v:yt('myrtle routine hip mobility'), notes:[
@@ -532,7 +532,6 @@ const DAYS = [
       {id:'D_lc',    name:'Prone leg curl',    target:'3×12', hasW:true},
       {id:'D_cp',    name:'Calf press (on leg press)', target:'3×15', hasW:true},
       {id:'D_ht',    name:'Hip thrust (plate-loaded machine)', target:'3×10', hasW:true},
-      {id:'D_gma',   name:'Seated hip abduction machine', target:'3×15', hasW:true},
       {id:'D_spd',   name:'Side plank with hip dip', target:'3×25sec', hasW:false, timerSec:25},
       {id:'D_pp',    name:'Rotational Pallof press', target:'3×12', hasW:false},
     ],
@@ -617,7 +616,6 @@ const EX_CONFIG = {
   A_bss:  {start:10,  inc:2.5,  rest:90,  homeAlt:null},
   A_lp:   {start:61.2,inc:9,    stack:'legpress', rest:90,  homeAlt:'Extra set Bulgarian split squat (no leg press at home)', skip_home:true},
   A_lsu:  {start:10,  inc:2.5,  rest:90,  homeAlt:null},
-  A_atg:  {start:0,   inc:2.5,  rest:90,  homeAlt:null},
   A_awr:  {start:0,   inc:0,    rest:60,  homeAlt:'Ab wheel rollout — same if you have one at home, otherwise plank walkouts'},
   A_db:   {start:0,   inc:0,    rest:60,  homeAlt:null},
   B_row:  {start:30,  inc:2.5,  rest:180, homeAlt:null},
@@ -632,7 +630,7 @@ const EX_CONFIG = {
   D_lc:   {start:20.5,inc:6.8,  stack:'spirit', rest:60,  homeAlt:'DB Romanian deadlift — no leg curl machine at home', skip_home:true},
   D_cp:   {start:43.1,inc:9,    stack:'legpress', rest:60,  homeAlt:'Standing calf raise — bodyweight or holding DBs', skip_home:true, note:'Done on the leg press — feet low on the platform, press through the balls of your feet. Adjust the weight to suit if the leg-press number feels off for calves.'},
   D_ht:   {start:20,  inc:5,    rest:120, homeAlt:'Glute bridge — bodyweight or barbell if available, no hip thrust machine at home', skip_home:true},
-  D_gma:  {start:20.5,inc:6.8,  stack:'spirit', rest:60,  homeAlt:'Side-lying hip abduction — 3×15/side (bodyweight)', skip_home:true},
+  A_gma:  {start:20.5,inc:6.8,  stack:'spirit', rest:60,  homeAlt:'Side-lying hip abduction — 3×15/side (bodyweight)', skip_home:true},
   D_spd:  {start:0,   inc:0,    rest:60,  homeAlt:'Side plank with hip dip — same, bodyweight'},
   D_pp:   {start:0,   inc:0,    rest:60,  homeAlt:'Anchor band to squat rack upright for Pallof press'},
   E_sdp:  {start:20,  inc:2.5,  rest:120, homeAlt:'Standing DB overhead press — no barbell at home', skip_home:true},
@@ -650,7 +648,6 @@ const EX_VIDEO = {
   A_bss:  ytS('bulgarian split squat form'),
   A_lp:   ytS('leg press how to'),
   A_lsu:  ytS('weighted cossack squat goblet'),
-  A_atg:  yt('ATG ankle pulses mobility'),
   A_awr:  ytS('ab wheel rollout form'),
   A_db:   yt('dead bug core exercise'),
   B_row:  ytS('barbell row form'),
@@ -665,7 +662,7 @@ const EX_VIDEO = {
   D_lc:   ytS('prone leg curl machine'),
   D_cp:   ytS('calf raise on leg press machine'),
   D_ht:   ytS('plate loaded hip thrust machine form'),
-  D_gma:  ytS('seated hip abduction machine glute med'),
+  A_gma:  ytS('seated hip abduction machine glute med'),
   D_spd:  ytS('side plank hip dip exercise'),
   D_pp:   ytS('rotational pallof press anti rotation'),
   E_sdp:  ytS('standing barbell overhead press form'),
